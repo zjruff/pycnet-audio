@@ -5,7 +5,8 @@ import wave
 import pandas as pd
 from pathlib import Path
 
-from . import image, wav
+from . import image
+from . import wav
 
 
 def findFiles(top_dir, ext):

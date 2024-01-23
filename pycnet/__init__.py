@@ -11,10 +11,11 @@ processing bioacoustics data on practical scales.
 
 import os
 
-import pycnet.cnet as cnet
-import pycnet.file as file
-import pycnet.prog as prog
-import pycnet.review as review
+from . import cnet
+from . import file
+from . import process
+from . import prog
+from . import review
 
 # Change if necessary
 sox_path = "C:\\Program Files (x86)\\sox-14-4-2"

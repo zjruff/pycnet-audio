@@ -3,24 +3,16 @@ audio in the frequency range [0, 4000 Hz]. Splits up the spectrogram
 generation across multiple folders for neater parallel processing.
 """
 
-import math
 import os 
 import pathlib
 import subprocess
 import sys
 import time
-import wave
 import multiprocessing as mp
 from multiprocessing import JoinableQueue, Process, Queue
 
-PACKAGEDIR = pathlib.Path(__file__).parents[1].absolute()
-sys.path.append(str(PACKAGEDIR))
-
 import pycnet
-
-# Adjust this if necessary
-sox_path = pycnet.sox_path
-
+from pycnet import sox_path
 
 def main():
     n_cores = min(mp.cpu_count(), 10)
@@ -33,10 +25,14 @@ def main():
         output_dir = target_dir
         image_dir = os.path.join(output_dir, "Temp", "images")
 
-    wav_paths = pycnet.file.findFiles(target_dir, ".wav")
-    wav_inventory = pycnet.file.makeFileInventory(wav_paths, target_dir)
-    inv_file = os.path.join(target_dir, "Wav_Inventory.csv")
-    wav_inventory.to_csv(inv_file, index=False)
+    inv_file = os.path.join(target_dir, "{0}_wav_inventory.csv".format(os.path.basename(target_dir)))
+    if not os.path.exists(inv_file):
+        wav_paths = pycnet.file.findFiles(target_dir, ".wav")
+        wav_inventory = pycnet.file.makeFileInventory(wav_paths, target_dir)
+        wav_inventory.to_csv(inv_file, index=False)
+    else:
+        wav_inventory = pd.read_csv(inv_file)
+        wav_paths = [os.path.join(target_dir, wav_inventory["Folder"][i], wav_inventory["Filename"][i]) for i in range(len(wav_inventory))]
     
     n_wav_files = len(wav_paths)
 

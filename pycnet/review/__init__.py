@@ -11,7 +11,6 @@ import sys
 from datetime import datetime, timedelta
 import pandas as pd
 
-import pycnet.file as file
 
 def getClipInfo(clip_name):
     """Extract information from the name of a spectrogram image file.
@@ -30,6 +29,17 @@ def getClipInfo(clip_name):
         clip_dict["Timestamp"] = datetime.strptime(str_datetime, "%Y%m%d_%H%M%S")
         clip_dict["Part"] = clip_vals[6]
         return clip_dict
+
+
+def buildClipDataFrame(pred_table):
+    """Extract basic information about clips in the predictions table."""
+    clips = pred_table["Filename"]
+    clip_df = pd.DataFrame(data = [getClipInfo(clip) for clip in clips])
+    clip_df["Filename"] = clips
+    day_1 = min(clip_df["Timestamp"])
+    clip_df["Rec_Day"] = [(date - day_1).days + 1 for date in clip_df["Timestamp"]]
+    clip_df["Rec_Week"] = [int((day - 1) / 7.) + 1 for day in clip_df["Rec_Day"]]
+    return clip_df
 
 
 def readReviewSettings(review_settings_file):
@@ -62,17 +72,6 @@ def getApparentDetections(pred_table, class_code, score_threshold):
     return dets
 
 
-def buildClipDataFrame(pred_table):
-    """Extract basic information about clips in the predictions table."""
-    clips = pred_table["Filename"]
-    clip_df = pd.DataFrame(data = [getClipInfo(clip) for clip in clips])
-    clip_df["Filename"] = clips
-    day_1 = min(clip_df["Timestamp"])
-    clip_df["Rec_Day"] = [(date - day_1).days + 1 for date in clip_df["Timestamp"]]
-    clip_df["Rec_Week"] = [int((day - 1) / 7.) + 1 for day in clip_df["Rec_Day"]]
-    return clip_df
-
-
 def makeReviewTable(pred_table, pred_settings, timescale="weekly"):
     """Extract apparent detections from a set of class scores.
     
@@ -87,21 +86,31 @@ def makeReviewTable(pred_table, pred_settings, timescale="weekly"):
     Apparent detections will be extracted in the order that the classes
     appear in <pred_settings>.
     """
+    class_names = list(pred_table.keys())[1:]
     clip_df = buildClipDataFrame(pred_table)
     
     review_df = pd.DataFrame()
+    
+    class_list, dist_list, thresh_list = [], [], []
     
     for i in pred_settings:
         class_code, class_threshold = i, pred_settings[i]
         review_rows = getApparentDetections(pred_table, class_code, class_threshold)
         if not review_rows.empty:
             n_rows = len(review_rows)
-            review_rows["Class"] = [class_code for j in range(n_rows)]
-            review_rows["Threshold"] = [str(class_threshold) for k in range(n_rows)]
             review_df = pd.concat([review_df, review_rows])
-    
+            class_list.extend([class_code for j in range(n_rows)])
+            dist_list.extend(review_rows[class_code])
+            thresh_list.extend([str(class_threshold) for k in range(n_rows)])
+
     review_df = review_df.merge(right=clip_df, on="Filename", how="left")
+    review_df["Top1Match"] = class_list
+    review_df["Top1Dist"] = dist_list
+    review_df["Threshold"] = thresh_list
+
+    output_cols = ["Filename", "Top1Match", "Top1Dist", "Threshold", 
+                    "Area", "Site", "Stn", "Part", "Rec_Day", 
+                    "Rec_Week"] + class_names
+    review_df = review_df[output_cols]
     
     return review_df
-    
-    

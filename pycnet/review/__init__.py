@@ -5,10 +5,11 @@ See target_classes.csv for a complete list of sonotypes detected by
 PNW-Cnet v4 and v5 and their corresponding labels.
 """
 
+from datetime import datetime, timedelta
+import multiprocessing as mp
 import os
 import re
 import sys
-from datetime import datetime, timedelta
 import pandas as pd
 
 
@@ -21,23 +22,27 @@ def getClipInfo(clip_name):
     """
     clip_vals = re.split(pattern="[-._]", string=clip_name)
     if len(clip_vals) != 8:
-        return
+        clip_dict = {"Area":"Unk", "Site":"Unk", "Stn":"Unk", "Part":"Unk"}
+        clip_dict.update({"Timestamp":datetime(2999,12,31,23,59,59)})
+        clip_dict["Date"] = clip_dict["Timestamp"].date()
     else:
         val_names = ["Area", "Site", "Stn", "Part"]
         clip_dict = dict(zip(["Area", "Site", "Stn"], clip_vals[:3]))
         str_datetime = '_'.join(clip_vals[3:5])
         clip_dict["Timestamp"] = datetime.strptime(str_datetime, "%Y%m%d_%H%M%S")
+        clip_dict["Date"] = clip_dict["Timestamp"].date()
         clip_dict["Part"] = clip_vals[6]
-        return clip_dict
+    return clip_dict
 
 
 def buildClipDataFrame(pred_table):
     """Extract basic information about clips in the predictions table."""
     clips = pred_table["Filename"]
-    clip_df = pd.DataFrame(data = [getClipInfo(clip) for clip in clips])
+    clip_df = pd.DataFrame(data=[getClipInfo(clip) for clip in clips])
     clip_df["Filename"] = clips
-    day_1 = min(clip_df["Timestamp"])
-    clip_df["Rec_Day"] = [(date - day_1).days + 1 for date in clip_df["Timestamp"]]
+    # clip_df["Date"] = [stamp.date() for stamp in clip_df["Timestamp"]]
+    day_1 = min(clip_df["Date"])
+    clip_df["Rec_Day"] = [(date - day_1).days + 1 for date in clip_df["Date"]]
     clip_df["Rec_Week"] = [int((day - 1) / 7.) + 1 for day in clip_df["Rec_Day"]]
     return clip_df
 
@@ -60,6 +65,16 @@ def readReviewSettings(review_settings_file):
         return
 
 
+def summarizeRecordingEffort(pred_table):
+    """Summarize recording effort by area, site, station, day and week."""
+    clip_df = buildClipDataFrame(pred_table)
+    grouping_vars = ["Area", "Site", "Stn", "Date", "Rec_Day", "Rec_Week"]
+    rec_effort = clip_df[grouping_vars+["Filename"]].groupby(grouping_vars, as_index=False).aggregate("count")
+    rec_effort["Effort"] = rec_effort["Filename"] / 300. # hours of recordings
+    rec_effort = rec_effort.rename(columns={"Filename":"Clips"}).round({"Effort": 2})
+    return rec_effort
+
+
 def getApparentDetections(pred_table, class_code, score_threshold):
     """Find apparent detections of <class_code> in <pred_table>."""
     class_names = list(pred_table.keys())[1:]
@@ -72,19 +87,72 @@ def getApparentDetections(pred_table, class_code, score_threshold):
     return dets
 
 
-def makeReviewTable(pred_table, pred_settings, timescale="weekly"):
+def tallyDetections(pred_table, score_threshold):
+    """Count up apparent detections of all classes at one threshold."""
+    group_fields = ["Area", "Site", "Stn", "Date"]
+    clip_info = buildClipDataFrame(pred_table)
+
+    class_names = pred_table.columns[1:]
+    class_scores = pred_table[class_names]
+    dets_tf = class_scores.applymap(lambda x: x >= score_threshold)
+    dets_tf = pd.concat([clip_info, dets_tf], axis=1)
+
+    dets_aggregated = dets_tf.groupby(group_fields).aggregate(dict([(code, sum) for code in class_names]))
+    n_rows = dets_aggregated.shape[0]
+    dets_aggregated.insert(loc=0, column="Threshold", value=[score_threshold for i in range(n_rows)])
+
+    return dets_aggregated
+
+
+def summarizeDetections(pred_table, n_workers=None):
+    """Tally apparent detections for all classes at various thresholds.
+    
+    Uses mp.Pool for multiprocessing, so it needs to be used in a main()
+    function, otherwise the worker processes multiply endlessly.
+    Seems to give identical results to the R function used by the Shiny 
+    app (good).
+    """
+    thresholds = [x / 100. for x in list(range(5, 100, 5)) + [98, 99]]
+    
+    group_fields = ["Area", "Site", "Stn", "Date"]
+    
+    n_cores = mp.cpu_count()
+    if not n_workers:
+        n_workers = min(n_cores, 10)
+    elif n_workers > n_cores:
+        n_workers = n_cores
+
+    with mp.Pool(processes = n_workers) as pool:
+        pool_args = [(pred_table, i) for i in thresholds]
+        thresh_dets = pool.starmap(tallyDetections, pool_args)
+
+    rec_effort = summarizeRecordingEffort(pred_table)
+
+    # Combine apparent detections for all thresholds
+    det_df = pd.concat(thresh_dets, axis=0)
+    det_df = rec_effort.merge(det_df, on=group_fields, how="left")
+    det_df = det_df.sort_values(by=["Threshold", "Area", "Site", "Stn", "Date"])
+
+    return det_df
+
+
+# Working pretty well but need to figure out how to handle rows that meet
+# the threshold for >1 class. Currently rows will appear once for every
+# class for which they meet the threshold - figure out how to collapse
+# those to a single label based on the order of classes in review_settings.
+def makeReviewTable(pred_table, review_settings, timescale="weekly"):
     """Extract apparent detections from a set of class scores.
     
     Arguments:
     
     <pred_table>: a set of class scores as generated by makePredictions
     
-    <pred_settings>: a dictionary mapping target classes to score 
+    <review_settings>: a dictionary mapping target classes to score 
     thresholds, such that any row where the score for a class exceeds 
     the score threshold for that class will be considered an apparent 
     detection of that class and included in the review table.
     Apparent detections will be extracted in the order that the classes
-    appear in <pred_settings>.
+    appear in <review_settings>.
     """
     class_names = list(pred_table.keys())[1:]
     clip_df = buildClipDataFrame(pred_table)
@@ -93,8 +161,8 @@ def makeReviewTable(pred_table, pred_settings, timescale="weekly"):
     
     class_list, dist_list, thresh_list = [], [], []
     
-    for i in pred_settings:
-        class_code, class_threshold = i, pred_settings[i]
+    for i in review_settings:
+        class_code, class_threshold = i, review_settings[i]
         review_rows = getApparentDetections(pred_table, class_code, class_threshold)
         if not review_rows.empty:
             n_rows = len(review_rows)

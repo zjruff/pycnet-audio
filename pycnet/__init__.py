@@ -1,8 +1,8 @@
 """
 'pycnet' library for audio processing
 
-The purpose of this library is to make the functionality of the PNW-Cnet
-audio classification model available in Python with an accessible API for
+The purpose of this library is to provide a Python-based API and 
+command-line tools for the PNW-Cnet audio classification model for
 processing bioacoustics data on practical scales.
 
 :copyright: (c) 2024 by Zachary Ruff
@@ -22,3 +22,6 @@ sox_path = "C:\\Program Files (x86)\\sox-14-4-2"
 
 assert os.path.isdir(sox_path)
 assert os.path.exists(os.path.join(sox_path, "sox.exe"))
+
+from importlib.metadata import version
+__version__ = version("pycnet")

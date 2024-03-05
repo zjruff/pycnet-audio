@@ -1,7 +1,10 @@
+"""Defines functions for processing .wav audio files."""
+
+import datetime as dt
 import math
+import multiprocessing as mp
 import os
 import wave
-import multiprocessing as mp
 from multiprocessing import JoinableQueue, Process, Queue
 
 
@@ -30,6 +33,8 @@ def makeSoxCmds(wav_path, sox_path, output_dir):
     Generate a list of SoX commands to create spectrograms for each 12 s
     of audio in file at <wav_path>. Output files (PNG images) will be generated
     in <output_dir>.
+    Can make this more flexible to allow for shorter and/or overlapping
+    audio segments.
     """
     wav_name = os.path.basename(wav_path)
     wav_length = getWavLength(wav_path, 's')

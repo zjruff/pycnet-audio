@@ -1,0 +1,1 @@
+"""Defines functions for processing image files, e.g. spectrograms."""

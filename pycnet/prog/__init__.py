@@ -42,9 +42,10 @@ class ProgBarWorker(Process):
             progbar = makeProgBar(n_done, self.total_size, 30)
             
             if all([n_done != 0, n_done == self.done]):
-                print('', end='\r')
+                # print('', end='\r')
+                continue
             else:
-                print(progbar, end='\r')
+                print(progbar) #, end='\r')
                 self.done = n_done
             
             if n_done == self.total_size:

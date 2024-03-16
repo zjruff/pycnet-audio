@@ -25,6 +25,7 @@ import tensorflow as tf
 from pycnet.cnet import v4_class_names, v5_class_names, v4_model_path, v5_model_path
 from pycnet.process import CLArgParser
 
+
 def getWavPaths(wav_inventory, top_dir):
     """Reconstruct full paths for wav files listed in the inventory."""
     wi = wav_inventory
@@ -71,7 +72,7 @@ def generateSpectrograms(proc_queue, n_workers, show_prog=True):
     done_queue = mp.Queue()
 
     for i in range(n_workers):
-        worker = pycnet.file.wav.WaveWorker(wav_queue, done_queue, pycnet.sox_path, image_dir)
+        worker = pycnet.file.wav.WaveWorker(wav_queue, done_queue, image_dir)
         worker.daemon = True
         worker.start()
 
@@ -149,7 +150,7 @@ def generateClassScores(target_dir, model_path, show_prog=True):
     return predictions
 
 
-def processFolder(target_dir, cnet_version="v5", spectro_dir=None, review_settings=None):
+def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, cleanup=True):
     """Generate spectrograms, generate class scores, build review file.
     
     Basically runs through the functions above in a logical sequence
@@ -157,12 +158,22 @@ def processFolder(target_dir, cnet_version="v5", spectro_dir=None, review_settin
     of .wav files. Narrates progress and marks the time at the beginning
     and end of each step to give the user a reasonable sense of
     processing speed.
+    
+    Accepts a processing mode as an argument which will determine which
+    of these steps are actually performed.
     """
-    folder_name = os.path.basename(target_dir)
     time_fmt = "%b %d at %H:%M:%S"
     
-    ### Inventory .wav files and set up processing directories ###
+    folder_name = os.path.basename(target_dir)
+    output_prefix = "{0}_{1}".format(folder_name, cnet_version)
+    
     wav_inv_file = os.path.join(target_dir, "{0}_wav_inventory.csv".format(folder_name))
+    class_score_file = os.path.join(target_dir, "{0}_class_scores.csv".format(output_prefix))
+    det_sum_file = os.path.join(target_dir, "{0}_detection_summary.csv".format(output_prefix))
+    review_file = os.path.join(target_dir, "{0}_review.csv".format(output_prefix))
+    kscope_file = review_file.replace("review", "review_kscope")
+    
+    ### Inventory .wav files and set up processing directories ###
     if not os.path.exists(wav_inv_file):
         print("Creating inventory file {0}.".format(wav_inv_file))
         wav_inventory = pycnet.file.inventoryFolder(target_dir)
@@ -176,56 +187,76 @@ def processFolder(target_dir, cnet_version="v5", spectro_dir=None, review_settin
     else:
         image_dir = os.path.join(spectro_dir, folder_name, "images")
     
+    proc_start = dt.datetime.now()
+    
     ### Generate the spectrograms ###
-    proc_queue = buildProcQueue(target_dir, image_dir)
-    print("Spectrograms will be generated in the following folders:")
-    print('\n'.join(sorted(proc_queue["dirs"])) + '\n')
+    if mode in ["process", "spectro"]:
     
-    spectro_start = dt.datetime.now()
-    print("Generating spectrograms starting {0}...\n".format(spectro_start.strftime(time_fmt)))
+        proc_queue = buildProcQueue(target_dir, image_dir)
+        print("Spectrograms will be generated in the following folders:")
+        print('\n'.join(sorted(proc_queue["dirs"])) + '\n')
+        
+        print("Generating spectrograms starting {0}...\n".format(proc_start.strftime(time_fmt)))
+        
+        n_workers = n_workers if n_workers else mp.cpu_count()
+        generateSpectrograms(proc_queue, n_workers)
+        
+        spectro_end = dt.datetime.now()
+        print("\nFinished {0}.".format(spectro_end.strftime(time_fmt)))
     
-    n_workers = min(mp.cpu_count(), 10)
-    generateSpectrograms(proc_queue, n_workers)
+    ### Generate class scores for each image and summarize apparent detections ###
+    if mode in ["process", "predict"]:
+        
+        predict_start = dt.datetime.now()
+        if mode == "predict":
+            print("\nGenerating class scores using PNW-Cnet {0} starting {1}...\n".format(cnet_version, predict_start.strftime(time_fmt)))
+        else:
+            print("\nGenerating class scores using PNW-Cnet {0}...\n".format(cnet_version))
+        
+        model_path = v4_model_path if cnet_version == "v4" else v5_model_path
+        
+        class_scores = generateClassScores(image_dir, model_path)
+        
+        class_scores.to_csv(class_score_file, index = False)
+        
+        predict_end = dt.datetime.now()
+        print("\nFinished {0}.".format(predict_end.strftime(time_fmt)))
+        print("\nClass scores written to {0}.\n".format(class_score_file))
     
-    spectro_end = dt.datetime.now()
-    print("\nFinished {0}.".format(spectro_end.strftime(time_fmt)))
+        ### Generate review files and summarize apparent detections ###
+        print("Summarizing apparent detections...", end='')
+        detection_summary = pycnet.review.summarizeDetections(class_scores)
+        print(" done.")
+        
+        detection_summary.to_csv(det_sum_file, index=False)
+        print("Detection summary written to {0}.\n".format(det_sum_file))
     
-    ### Generate class scores for each image using PNW-Cnet ###
-    predict_start = dt.datetime.now()
-    print("\nGenerating class scores using PNW-Cnet {0}...\n".format(cnet_version))
-    
-    model_path = v4_model_path if cnet_version == "v4" else v5_model_path
-    
-    class_scores = generateClassScores(image_dir, model_path)
-    
-    output_file = os.path.join(target_dir, "{0}_{1}_class_scores.csv".format(folder_name, cnet_version))
-    class_scores.to_csv(output_file, index = False)
-    
-    predict_end = dt.datetime.now()
-    print("\nFinished {0}.".format(predict_end.strftime(time_fmt)))
-    print("\nClass scores written to {0}.\n".format(output_file))
-    
-    ### Generate review files and summarize apparent detections ###
-    
-    print("Summarizing apparent detections...", end='')
-    detection_summary = pycnet.review.summarizeDetections(class_scores)
-    print(" done.")
-    det_sum_file = os.path.join(target_dir, "{0}_{1}_detection_summary.csv".format(folder_name, cnet_version))
-    detection_summary.to_csv(det_sum_file, index=False)
-    print("Detection summary written to {0}.\n".format(det_sum_file))
+    ### Generate review files containing apparent detections ###
+    if mode in ["process", "review"]:
+        print("Generating review file...", end='')
+        
+        try:
+            class_scores
+        except:
+            class_scores = pycnet.review.readPredFile(class_score_file)
+            
+        review_df = pycnet.review.makeReviewTable(class_scores)
+        review_df.to_csv(review_file, index=False)
+        print(" done.")
     
     ### Clean up temporary files and folders ###
-    print("Removing temporary folders...", end='')
-    os.system("rmdir /s /q {0}".format(os.path.dirname(image_dir)))
-    print(" done.\n")
+    if cleanup:
+        pycnet.file.removeSpectroDir(target_dir, spectro_dir)
+    
+    proc_end = dt.datetime.now()
     
     ### Calculate processing speed ###
-    d_hours = sum(wav_inventory["Duration"]) / 3600.
-    p_hours = (predict_end - spectro_start).seconds / 3600.
-    dp_ratio = d_hours / p_hours
-    
-    print("Processed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})".format(d_hours, p_hours, dp_ratio))
-    
+    if mode == "process":
+        d_hours = sum(wav_inventory["Duration"]) / 3600.
+        p_hours = (proc_end - proc_start).seconds / 3600.
+        dp_ratio = d_hours / p_hours
+        print("Processed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})".format(d_hours, p_hours, dp_ratio))
+
     return
 
 
@@ -233,27 +264,52 @@ def main():
     """Perform one or more processing operations on a folder.
     
     Intended to be run as a command-line script with behavior determined
-    by one or more arguments. Arguments will generally include the mode
-    (determines what the script actually does) and a target directory
-    containing the data you want to work with.
+    by one or more arguments. At a minimum, arguments should include a 
+    mode (determines what the script actually does) and a target 
+    directory containing the data you want to work with.
     
     usage:
     pycnet [mode] [target dir] [optional arguments]
     
     Run with the -h (help) flag, e.g. 'pycnet -h', to see all options.
     """
-    valid_modes = ["rename", "inventory", "spectro", "predict", "review", "process", "cleanup", "config"]
-    
+    # valid_modes = ["rename", "inventory", "spectro", "predict", "review", "process", "cleanup", "config"]
+    valid_modes = ["process", "spectro", "predict", "inventory", "rename", "cleanup"]
+
     args = CLArgParser.parsePycnetArgs()
-    
+
     if not args.mode in valid_modes:
-        print("\nMode not recognized. Please provide one of the following options: ")
-        print('\n'.join(sorted(valid_modes)))
-    
-    
-    print("Args: ")
-    print(str(args))
-    
+        print("\nMode '{0}' not recognized. Please use one of the following options:".format(args.mode))
+        print('\n'.join(valid_modes))
+
+    else:
+        if args.mode == "process":
+            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers, args.review_settings]
+            processFolder(*proc_args)
+
+        elif args.mode == "spectro":
+            spectro_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers]
+            processFolder(*spectro_args, cleanup=False)
+
+        elif args.mode == "predict":
+            predict_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir]
+            processFolder(*predict_args, cleanup=False)
+
+        elif args.mode == "inventory":
+            inv_args = [args.target_dir]
+            pycnet.file.inventoryFolder(*inv_args)
+
+        elif args.mode == "rename":
+            rename_args = [args.target_dir, "wav"]
+            pycnet.file.massRenameFiles(*rename_args)
+            
+        elif args.mode == "cleanup":
+            cleanup_args = [args.target_dir, args.image_dir]
+            pycnet.file.removeSpectroDir(*cleanup_args)
+
+        else:
+            pass
+
 if __name__ == "__main__":
     main()
 

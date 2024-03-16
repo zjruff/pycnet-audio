@@ -13,6 +13,12 @@ import sys
 import pandas as pd
 
 
+def readPredFile(pred_file_path):
+    """Read the prediction file into a dataframe."""
+    pred_table = pd.read_csv(pred_file_path)
+    return pred_table
+
+
 def getClipInfo(clip_name):
     """Extract information from the name of a spectrogram image file.
     
@@ -65,6 +71,17 @@ def readReviewSettings(review_settings_file):
         return
 
 
+def getDefaultReviewSettings(pred_table):
+    """Define default thresholds for classes to include in review file."""
+    stoc_classes = ["STOC", "STOC_IRREG", "STOC_4Note", "STOC_Series"]
+    class_names = list(pred_table.keys())[1:]
+    class_names = sorted(class_names, key=lambda x: x in stoc_classes, reverse=True)
+    review_settings = {}
+    for i in class_names:
+        review_settings[i] = 0.25 if i in stoc_classes else 0.95
+    return review_settings
+
+
 def summarizeRecordingEffort(pred_table):
     """Summarize recording effort by area, site, station, day and week."""
     clip_df = buildClipDataFrame(pred_table)
@@ -109,8 +126,7 @@ def summarizeDetections(pred_table, n_workers=None):
     
     Uses mp.Pool for multiprocessing, so it needs to be used in a main()
     function, otherwise the worker processes multiply endlessly.
-    Seems to give identical results to the R function used by the Shiny 
-    app (good).
+    Results appear identical to the R function used by the Shiny app.
     """
     thresholds = [x / 100. for x in list(range(5, 100, 5)) + [98, 99]]
     
@@ -140,7 +156,7 @@ def summarizeDetections(pred_table, n_workers=None):
 # the threshold for >1 class. Currently rows will appear once for every
 # class for which they meet the threshold - figure out how to collapse
 # those to a single label based on the order of classes in review_settings.
-def makeReviewTable(pred_table, review_settings, timescale="weekly"):
+def makeReviewTable(pred_table, review_settings=None, timescale="weekly"):
     """Extract apparent detections from a set of class scores.
     
     Arguments:
@@ -153,11 +169,18 @@ def makeReviewTable(pred_table, review_settings, timescale="weekly"):
     detection of that class and included in the review table.
     Apparent detections will be extracted in the order that the classes
     appear in <review_settings>.
+    If no review_settings dictionary is provided, the function will
+    default to retrieving detections for northern spotted owl classes
+    first with a threshold of 0.25 and will then retrieve detections for
+    all other classes in alphabetical order with a threshold of 0.95.
     """
     class_names = list(pred_table.keys())[1:]
     clip_df = buildClipDataFrame(pred_table)
     
     review_df = pd.DataFrame()
+    
+    if not review_settings:
+        review_settings = getDefaultReviewSettings(pred_table)
     
     class_list, dist_list, thresh_list = [], [], []
     

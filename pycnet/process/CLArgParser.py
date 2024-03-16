@@ -8,10 +8,10 @@ import os
 def parsePycnetArgs():
     """Define command-line options for the 'pycnet' console script.
     
-    Inevitably a bit of a mess so sequestered here.
+    Inevitably messy, so sequestered here instead of in __init__.py
     """
     n_cores = mp.cpu_count()
-    
+
     parser = argparse.ArgumentParser(description="Perform one or more processing operations on a folder.")
 
     parser.add_argument("mode", metavar="MODE", type=str,
@@ -19,35 +19,35 @@ def parsePycnetArgs():
         help="Operation to be performed. Options: 'inventory' (default), 'rename', 'spectro', 'predict', 'review', 'process', 'cleanup', 'config'.", default="inventory")
 
     parser.add_argument("target_dir", metavar="TARGET_DIR", type=str, help="Path to the directory containing .wav files to be processed.")
-    
-    parser.add_argument("-v", dest="cnet_version", type=str, choices=["v4", "v5"], default="v5",
+
+    parser.add_argument("-c", dest="cnet_version", type=str, choices=["v4", "v5"], default="v5",
         help="Version of PNW-Cnet to use when generating class scores. Options: 'v5' (default) or 'v4'.")
-    
-    parser.add_argument("-s", dest="spectro_dir", type=str, 
+
+    parser.add_argument("-i", dest="image_dir", type=str,
         help="Path to the directory where spectrogram images will be stored. Will be created if it does not already exist. Default: a folder called Temp under target dir.")
-    
-    parser.add_argument("-o", dest="output_dir", type=str,
-        help="Path to the directory where output CSV files will be saved. Will be created if it does not already exist. Default: same as target dir.")
-    
+
     parser.add_argument("-w", dest="n_workers", type=int,
         help="Number of worker processes to use when generating spectrograms. Default: number of available cores (currently {0}).".format(n_cores))
-    
+
     parser.add_argument("-r", dest="review_settings", type=str,
         help="Path to file containing settings to use when generating the review file.")
-    
-    parser.add_argument("-q", dest="quiet_mode",
-        help="Quiet mode (suppress progress bars and informational messages).")
-    
-    parser.add_argument("-c", dest="auto_cleanup",
-        help="Remove spectrogram image files and temporary folders when class scores have been generated.")
+
+    # parser.add_argument("-o", dest="output_dir", type=str,
+        # help="Path to the directory where output CSV files will be saved. Will be created if it does not already exist. Default: same as target dir.")
+
+    # parser.add_argument("-q", dest="quiet_mode",
+        # help="Quiet mode (suppress progress bars and informational messages).")
+
+    # parser.add_argument("-a", dest="auto_cleanup",
+        # help="Remove spectrogram image files and temporary folders when class scores have been generated.")
 
     args = parser.parse_args()
     
     return args
 
 
-def checkPycnetArgs(args):
-    """Check whether all required args for the chosen mode are present.
+def correctPycnetArgs(orig_args):
+    """Check arguments for audio processing and correct as necessary.
     
     The main() function in pycnet.process.__init__ is kind of a 
     switchboard for all the various tasks that the package is meant
@@ -61,4 +61,10 @@ def checkPycnetArgs(args):
     valid modes: rename, inventory, spectro, predict, review, process, cleanup, config
     
     """
-    return True
+    corrected_args = {}
+    corrected_args["target_dir"] = orig_args.target_dir
+    if orig_args.mode == "process":
+        if not orig_args.n_workers:
+            corrected_args["n_workers"] = mp.cpu_count()
+
+    return corrected_args

@@ -11,17 +11,13 @@ processing bioacoustics data on practical scales.
 
 import os
 
+
 from . import cnet
 from . import file
 from . import process
 from . import prog
 from . import review
 
-# Change if necessary
-sox_path = "C:\\Program Files (x86)\\sox-14-4-2"
-
-assert os.path.isdir(sox_path)
-assert os.path.exists(os.path.join(sox_path, "sox.exe"))
 
 from importlib.metadata import version
 __version__ = version("pycnet")

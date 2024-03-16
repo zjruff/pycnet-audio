@@ -27,7 +27,7 @@ def getWavLength(wav_path, mode='h'):
         return wav_length_s
 
 
-def makeSoxCmds(wav_path, sox_path, output_dir):
+def makeSoxCmds(wav_path, output_dir):
     """Generate SoX commands to create a set of spectrograms from <wav_file>.
     
     Generate a list of SoX commands to create spectrograms for each 12 s
@@ -80,23 +80,20 @@ class WaveWorker(Process):
     <done_queue> contains paths of wav files that have already been processed;
     size of <done_queue> is compared to the total number of wavs to build the
     progress bar.
-    <sox_path> is constant but is hardcoded at the top of the package for ease
-    of making changes if needed.
     <output_dir> is the top level of the directory where spectrograms will be
     generated; this will typically be split into chunks to be handled by 
     parallel processes.
     """
-    def __init__(self, in_queue, done_queue, sox_path, output_dir):
+    def __init__(self, in_queue, done_queue, output_dir):
         Process.__init__(self)
         self.in_queue = in_queue
         self.done_queue = done_queue
-        self.sox_path = sox_path
         self.output_dir = output_dir
     
     def run(self):
         while True:
             wav_path, spectro_dir = self.in_queue.get()
-            sox_cmds = makeSoxCmds(wav_path, self.sox_path, spectro_dir)
+            sox_cmds = makeSoxCmds(wav_path, spectro_dir)
             for i in sox_cmds:
                 os.system(i)
             self.in_queue.task_done()

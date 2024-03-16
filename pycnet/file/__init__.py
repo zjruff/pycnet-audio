@@ -227,3 +227,21 @@ def massRenameFiles(top_dir, extension, prefix=''):
     
     return
 
+
+def removeSpectroDir(target_dir, spectro_dir=None):
+    """Recursively remove temporary files and folders."""
+    folder_name = os.path.basename(target_dir)
+    
+    if not spectro_dir:
+        image_dir = os.path.join(target_dir, "Temp", "images")
+    else:
+        image_dir = os.path.join(spectro_dir, folder_name, "images")
+    
+    if not os.path.exists(image_dir):
+        print("Temporary folder not found.")
+    else:
+        print("\nRemoving temporary folders...", end='')
+        os.system("rmdir /s /q {0}".format(os.path.dirname(image_dir)))
+        print(" done.\n")
+    
+    return

@@ -2,10 +2,11 @@
 audio data.
 
 functions: 
-- makeProgBar
+- makeProgBar: generates a text-based progress bar.
 
 classes:
-- ProgBarWorker
+- ProgBarWorker: monitors progress and displays it with a text-based 
+progress bar.
 """
 
 import time
@@ -13,11 +14,20 @@ from multiprocessing import Process, Queue
 
 
 def makeProgBar(done, total, width=30):
-    """Creates a nicely formatted text progress bar.
+    """Create a nicely formatted text-based progress bar.
     
     Progress bar expresses <done> as a proportion of <total>. 
     <width> is the total number of characters comprising the inner (filled)
     portion of the progress bar; 30 seems to work well.
+    
+    Arguments:
+    - done: how many items from the to-do list have been completed
+    - total: how many items were in the to-do list to begin with
+    - width: total number of characters comprising the fillable portion
+    of the progress bar.
+    
+    Returns:
+    - prog_bar: a nicely formatted text-based progress bar.
     """
     prop_done = done / total
     n_fill = int(prop_done * width)
@@ -28,7 +38,9 @@ def makeProgBar(done, total, width=30):
 
 
 class ProgBarWorker(Process):
-
+    """A worker process that prints a text-based progress bar.
+    
+    """
     def __init__(self, done_queue, total_size):
         Process.__init__(self)
         self.done_queue = done_queue

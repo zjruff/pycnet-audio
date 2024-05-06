@@ -2,19 +2,54 @@
 PNW-Cnet model and extracting a set of apparent detections of one or
 more target classes.
 See target_classes.csv for a complete list of sonotypes detected by
-PNW-Cnet v4 and v5 and their corresponding labels.
+PNW-Cnet v4 and v5 and their corresponding codes / labels.
+
+Functions:
+- readPredFile: read a table of class scores from a CSV file.
+- getClipInfo: infer information about a file from its filename.
+- buildClipDataFrame: produce a table listing when each clip was
+recorded.
+- getSourceFile:
+- getSourceFolders:
+- readReviewSettings: read a mapping of target classes to score 
+thresholds from a CSV file.
+- getDefaultReviewSettings: decide which score threshold to use for
+each target class when no review_settings file was provided.
+- summarizeRecordingEffort: summarize the number of clips and amount
+of recording time by site, station and date.
+- getApparentDetections: find apparent detections of one class at one
+score threshold within a set of class scores.
+- tallyDetections: tally up the number of apparent detections for all
+classes in a set of class scores at a single threshold.
+- summarizeDetections: tally up apparent detections of all target 
+classes from a set of class scores across a range of score thresholds.
+- makeReviewTable: produce a table of apparent detections of one or
+more target classes for manual review.
 """
 
 from datetime import datetime, timedelta
 import multiprocessing as mp
 import os
+import pycnet
 import re
 import sys
 import pandas as pd
 
+from pathlib import Path
+from pycnet.cnet import v4_class_names, v5_class_names
+
 
 def readPredFile(pred_file_path):
-    """Read the prediction file into a dataframe."""
+    """Read a table of PNW-Cnet class scores from a CSV file.
+    
+    Arguments:
+    - pred_file_path: path to the file containing the class scores.
+    
+    Returns:
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    """
+    
     pred_table = pd.read_csv(pred_file_path)
     return pred_table
 
@@ -25,7 +60,15 @@ def getClipInfo(clip_name):
     Returns info as a dictionary.
     Clip names will be in the form [Area]_[Site]-[Stn]_[Date]_[Time]_part_[part].png
     e.g. COA_23459-C_20230316_081502_part_001.png
+    
+    Arguments:
+    - clip_name: the filename of a spectrogram image file.
+    
+    Returns:
+    - clip_dict: a dictionary of values inferred from the image 
+    filename.
     """
+
     clip_vals = re.split(pattern="[-._]", string=clip_name)
     if len(clip_vals) != 8:
         clip_dict = {"Area":"Unk", "Site":"Unk", "Stn":"Unk", "Part":"Unk"}
@@ -41,8 +84,47 @@ def getClipInfo(clip_name):
     return clip_dict
 
 
+def getClipTimestamp(source_file, offset):
+    """Get the timestamp of a clip taken from a longer file.
+    
+    Arguments:
+    - source_file: a .wav file name including a timestamp in the format
+    YYYYMMDD_HHMMSS.
+    - offset: location of the clip in seconds from the start of the
+    long-form .wav file.
+    
+    Returns:
+    A tuple containing two strings representing the date and the time
+    at the start of the clip.
+    """
+
+    stamp_patt = re.compile("[0-9]{8}_[0-9]{6}")
+    srcfile_str_stamp = stamp_patt.findall(source_file)[0]
+    srcfile_stamp = datetime.strptime(srcfile_str_stamp, "%Y%m%d_%H%M%S")
+    clip_stamp = srcfile_stamp + timedelta(seconds=offset)
+    clip_date, clip_time = clip_stamp.strftime("%m-%d-%Y_%H:%M:%S").split('_')
+    return (clip_date, clip_time)
+    
+def getReadableOffset(offset):
+    """Convert offset in seconds to string in H:MM:SS or MM:SS format."""
+    stamp = datetime(2000, 1, 1) + timedelta(seconds = offset)
+    time_format = "%H:%M:%S" if offset >= 3600 else "%M:%S"
+    str_offset = datetime.strftime(stamp, time_format)
+    return str_offset
+
+
 def buildClipDataFrame(pred_table):
-    """Extract basic information about clips in the predictions table."""
+    """Extract basic information about clips in the predictions table.
+    
+    Arguments:
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    
+    Returns:
+    A Pandas DataFrame summarizing information about the audio data 
+    that were processed to produce the class scores.
+    """
+    
     clips = pred_table["Filename"]
     clip_df = pd.DataFrame(data=[getClipInfo(clip) for clip in clips])
     clip_df["Filename"] = clips
@@ -53,14 +135,80 @@ def buildClipDataFrame(pred_table):
     return clip_df
 
 
-def readReviewSettings(review_settings_file):
-    """Read in a CSV and return a dict mapping threshold to class.
+def getSourceFile(clip_name):
+    """Return the name of the .wav file from which a clip was taken.
     
     Arguments:
-    <review_settings_file>: should be a CSV file with one field <Class>
-    containing the codes of the classes to be included in the review
-    file and one field <Threshold> containing the score threshold to
-    use for each class.
+    - clip_name: a filename created by concatenating the name of the 
+    long-form audio file, a string indicating a position within that
+    file (e.g. "part_017"), and a file extension (.png).
+    
+    Returns:
+    A tuple containing the source filename and the part_xxx string
+    at the end of the clip name. If the clip name is not formatted as
+    expected, the returned tuple will contain two empty strings.
+    """
+    
+    clip_pattern = re.compile("[A-Z]+?_[A-Za-z0-9]+?-[A-Za-z0-9]+?_[0-9]{8}_[0-9]{6}_part_[0-9]+?\\.png")
+    part_pattern = re.compile("part_[0-9]+")
+    if not clip_pattern.match(clip_name):
+        return ("", "")
+    else:
+        base_name = os.path.splitext(clip_name)[0]
+        source_file = base_name.split("_part")[0] + ".wav"
+        str_part = part_pattern.findall(base_name)[0]
+        return (source_file, str_part)
+
+
+def getSourceFolders(clip_list, top_dir):
+    """Get locations of a set of files within a directory tree.
+    
+    This function will attempt to associate each spectrogram image
+    with an existing source file in the directory tree rooted at 
+    top_dir, based on the filename. Images for which a source file
+    cannot be found, or for which there are multiple possible source
+    files, will cause the function to return nothing.
+    
+    Arguments:
+    - clip_list: a list of image filenames in the format 
+    [source_file]_part_xxx.png.
+    - top_dir: the directory containing the source .wav files. Values
+    in the FOLDER field will be generated relative to this directory.
+    
+    Returns:
+    A Pandas DataFrame listing the folder (relative to top_dir), source
+    filename, "part_xxx" string, and image filename for each clip.
+    """
+    
+    source_file_list, part_list = zip(*[getSourceFile(clip) for clip in clip_list])
+    
+    wav_paths = pycnet.file.findFiles(top_dir, ".wav")
+    wav_dirs, wav_names = zip(*[os.path.split(path) for path in wav_paths])
+    wav_folders = [str(Path(dir).relative_to(top_dir)) for dir in wav_dirs]
+    
+    source_file_df = pd.DataFrame(data={"Filename": clip_list, "IN_FILE": source_file_list, "PART": part_list})
+    wav_df = pd.DataFrame(data={"Path": wav_paths, "IN_FILE": wav_names, "FOLDER": wav_folders})
+    
+    joined_df = source_file_df.merge(wav_df, how="left", on="IN_FILE")
+    
+    if joined_df.shape[0] != source_file_df.shape[0]:
+        print("Warning! Either source files could not be located for all clips or some clips are associated with duplicate filenames.")
+        return
+    else:
+        return joined_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
+
+
+def readReviewSettings(review_settings_file):
+    """Read a mapping of target class to score threshold from a CSV file.
+    
+    Arguments:
+    - review_settings_file: should be a CSV file with a "Class" column
+    listing the codes of the classes to be included in the review
+    file and a "Threshold" column listing the score threshold to use 
+    for each class.
+    
+    Returns:
+    A dictionary of score thresholds indexed by class code.
     """
     try:
         df = pd.read_csv(review_settings_file)
@@ -71,19 +219,53 @@ def readReviewSettings(review_settings_file):
         return
 
 
-def getDefaultReviewSettings(pred_table):
-    """Define default thresholds for classes to include in review file."""
+def getDefaultReviewSettings(cnet_version):
+    """Define default thresholds for classes to include in review file.
+    
+    If the user does not provide a review_settings file listing the
+    classes and score thresholds they would like to use, by default
+    a threshold of 0.25 or 0.50 will be used for northern spotted owl 
+    classes and a threshold of 0.95 will be used for all other target 
+    classes. This corresponds to the thresholds historically used by 
+    the northern spotted owl monitoring program to determine which 
+    clips to review.
+    We recommend tailoring your review criteria more narrowly, 
+    especially when using PNW-Cnet v5, as the large number of target 
+    classes can result in a large and unwieldy review table full of 
+    species you don't care about.
+    
+    Arguments:
+    - cnet_version: version of the PNW-Cnet model being used, either 
+    "v4" or "v5".
+    
+    Returns:
+    A dictionary of score thresholds indexed by class code.
+    """
     stoc_classes = ["STOC", "STOC_IRREG", "STOC_4Note", "STOC_Series"]
-    class_names = list(pred_table.keys())[1:]
-    class_names = sorted(class_names, key=lambda x: x in stoc_classes, reverse=True)
-    review_settings = {}
+    class_names = v4_class_names if cnet_version == "v4" else v5_class_names
+    class_names.sort(key=lambda x: x in stoc_classes, reverse=True)
+    settings_dict = {}
     for i in class_names:
-        review_settings[i] = 0.25 if i in stoc_classes else 0.95
-    return review_settings
+        if cnet_version == "v5":
+            settings_dict[i] = 0.50 if i in stoc_classes else 0.95
+        else:
+            settings_dict[i] = 0.25 if i in stoc_classes else 0.95
+    return settings_dict
 
 
 def summarizeRecordingEffort(pred_table):
-    """Summarize recording effort by area, site, station, day and week."""
+    """Summarize recording effort by area, site, station, day and week.
+    
+    Arguments:
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    
+    Returns:
+    A Pandas DataFrame with a row for each combination of area, site, 
+    station, and date listing the number of 12-second clips processed 
+    to produce the class scores and the number of hours of recording 
+    time.
+    """
     clip_df = buildClipDataFrame(pred_table)
     grouping_vars = ["Area", "Site", "Stn", "Date", "Rec_Day", "Rec_Week"]
     rec_effort = clip_df[grouping_vars+["Filename"]].groupby(grouping_vars, as_index=False).aggregate("count")
@@ -93,7 +275,22 @@ def summarizeRecordingEffort(pred_table):
 
 
 def getApparentDetections(pred_table, class_code, score_threshold):
-    """Find apparent detections of <class_code> in <pred_table>."""
+    """Filter PNW-Cnet class scores to apparent detections of one class.
+    
+    Arguments:
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    - class_code: the abbreviation for the target class of interest.
+    Note that class codes are specific to the version of PNW-Cnet used.
+    - score_threshold: a number between 0 and 1 determining the minimum
+    score for the chosen class at which a clip will be treated as an 
+    apparent detection.
+    
+    Returns:
+    A Pandas DataFrame, specifically a filtered version of pred_table 
+    containing only lines where the score for class_code was greater 
+    than or equal to score_threshold.
+    """
     class_names = list(pred_table.keys())[1:]
     if not class_code in class_names:
         dets = pd.DataFrame()
@@ -105,7 +302,19 @@ def getApparentDetections(pred_table, class_code, score_threshold):
 
 
 def tallyDetections(pred_table, score_threshold):
-    """Count up apparent detections of all classes at one threshold."""
+    """Count up apparent detections of all classes at one threshold.
+    
+    Arguments:
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    - score_threshold: minimum score for a clip to be considered an 
+    apparent detection for any class.
+    
+    Returns:
+    A Pandas DataFrame listing the number of apparent detections of all
+    target classes at the score threshold specified, grouped by area, 
+    site, station and date. 
+    """
     group_fields = ["Area", "Site", "Stn", "Date"]
     clip_info = buildClipDataFrame(pred_table)
 
@@ -127,13 +336,26 @@ def summarizeDetections(pred_table, n_workers=None):
     Uses mp.Pool for multiprocessing, so it needs to be used in a main()
     function, otherwise the worker processes multiply endlessly.
     Results appear identical to the R function used by the Shiny app.
+    
+    Arguments:
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    - n_workers: number of worker processes to use for multiprocessing.
+    Defaults to either 10 or the number of logical cores on the host 
+    machine, whichever is lower.
+    
+    Returns:
+    A Pandas DataFrame listing the number of apparent detections of all
+    target classes over a range of score thresholds 
+    [0.05, 0.10, ..., 0.95, 0.98, 0.99], grouped by area, site, station
+    and date.
     """
     thresholds = [x / 100. for x in list(range(5, 100, 5)) + [98, 99]]
     
     group_fields = ["Area", "Site", "Stn", "Date"]
     
     n_cores = mp.cpu_count()
-    if not n_workers:
+    if n_workers is None:
         n_workers = min(n_cores, 10)
     elif n_workers > n_cores:
         n_workers = n_cores
@@ -156,14 +378,21 @@ def summarizeDetections(pred_table, n_workers=None):
 # the threshold for >1 class. Currently rows will appear once for every
 # class for which they meet the threshold - figure out how to collapse
 # those to a single label based on the order of classes in review_settings.
-def makeReviewTable(pred_table, review_settings=None, timescale="weekly"):
+# - Can sort by the index of each column in the review_settings keys, then
+# use DataFrame.drop_duplicates(keep='first').
+def makeReviewTable(pred_table, cnet_version="v5", review_settings=None):
     """Extract apparent detections from a set of class scores.
     
+    This function is more about selecting clips representing potential
+    detections based on review criteria and generating information 
+    about those clips. The makeKscopeReviewTable() function below is
+    designed to format this table for output and human review using 
+    Kaleidoscope.
+    
     Arguments:
-    
-    <pred_table>: a set of class scores as generated by makePredictions
-    
-    <review_settings>: a dictionary mapping target classes to score 
+    - pred_table: a Pandas DataFrame containing PNW-Cnet class scores 
+    indexed by image filename.
+    - review_settings: a dictionary mapping target classes to score 
     thresholds, such that any row where the score for a class exceeds 
     the score threshold for that class will be considered an apparent 
     detection of that class and included in the review table.
@@ -173,16 +402,26 @@ def makeReviewTable(pred_table, review_settings=None, timescale="weekly"):
     default to retrieving detections for northern spotted owl classes
     first with a threshold of 0.25 and will then retrieve detections for
     all other classes in alphabetical order with a threshold of 0.95.
+    
+    Returns:
+    A Pandas DataFrame listing apparent detections for one or more 
+    classes according to the review criteria provided.
     """
-    class_names = list(pred_table.keys())[1:]
+    
+    if cnet_version == "v5":
+        class_names = v5_class_names
+    else:
+        class_names = v4_class_names
+    
     clip_df = buildClipDataFrame(pred_table)
     
     review_df = pd.DataFrame()
     
-    if not review_settings:
-        review_settings = getDefaultReviewSettings(pred_table)
+    if review_settings is None:
+        review_settings = getDefaultReviewSettings(cnet_version)
     
     class_list, dist_list, thresh_list = [], [], []
+    review_classes = list(review_settings.keys())
     
     for i in review_settings:
         class_code, class_threshold = i, review_settings[i]
@@ -194,14 +433,83 @@ def makeReviewTable(pred_table, review_settings=None, timescale="weekly"):
             dist_list.extend(review_rows[class_code])
             thresh_list.extend([str(class_threshold) for k in range(n_rows)])
 
-    review_df = review_df.merge(right=clip_df, on="Filename", how="left")
-    review_df["Top1Match"] = class_list
-    review_df["Top1Dist"] = dist_list
-    review_df["Threshold"] = thresh_list
+    if not review_df.empty:
+        review_df = review_df.merge(right=clip_df, how="left", on="Filename")
+        review_df["TOP1MATCH"] = class_list
+        review_df["TOP1DIST"] = dist_list
+        review_df["THRESHOLD"] = thresh_list
 
-    output_cols = ["Filename", "Top1Match", "Top1Dist", "Threshold", 
-                    "Area", "Site", "Stn", "Part", "Rec_Day", 
-                    "Rec_Week"] + class_names
-    review_df = review_df[output_cols]
-    
+        output_cols = ["Filename", "TOP1MATCH", "TOP1DIST", "THRESHOLD", 
+                        "Area", "Site", "Stn", "Part", "Rec_Day", 
+                        "Rec_Week", "AUTO_TAG"] + class_names
+
+        review_df["Class_Order"] = [review_classes.index(x) for x in review_df["TOP1MATCH"]]
+        review_df.sort_values(by=["Filename", "Class_Order"], inplace=True)
+        
+        tags_all = review_df.groupby("Filename").agg(AUTO_TAG=pd.NamedAgg(column="TOP1MATCH", aggfunc=lambda x: '+'.join(sorted(list(set(x))))))
+        review_df = review_df.merge(tags_all, on="Filename", how="left")
+        
+        review_df.drop_duplicates(subset="Filename", keep="first", inplace=True)
+
+        review_df = review_df[output_cols].sort_values(by=["TOP1MATCH", "Filename"])
+
     return review_df
+
+
+def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_settings=None, timescale="weekly"):
+    """Summarize apparent detections for review using Kaleidoscope.
+
+    Arguments:
+    - pred_table: a Pandas DataFrame listing a set of image filenames 
+    and the class scores produced by PNW-Cnet for each image.
+    - target_dir: path to the directory containing the audio data.
+    - cnet_version: the version of PNW-Cnet used to generate the class
+    scores (either "v4" or "v5").
+    - review_settings: a dictionary mapping target classes to score 
+    thresholds. See makeReviewTable() for details.
+    - timescale: the temporal scale ("daily" or "weekly") at which to 
+    tally the apparent detections of each class.
+
+    Returns:
+    A Pandas DataFrame listing apparent detections of one or more 
+    classes, formatted to be readable and editable using Wildlife 
+    Acoustics' Kaleidoscope software (after being written to a CSV 
+    file).
+    """
+
+    output_cols = ["FOLDER", "IN_FILE", "PART", "CHANNEL", "OFFSET", 
+    "DURATION", "DATE", "TIME", "OFFSET_MMSS", "TOP1MATCH", "TOP1DIST", "THRESHOLD", 
+    "SORT", "AUTO_TAG", "VOCALIZATIONS", "MANUAL_ID"]
+
+    review_df = makeReviewTable(pred_table, cnet_version, review_settings)
+    if review_df.empty:
+        kscope_df = pd.DataFrame(columns=output_cols)
+    else:
+        n_clips = review_df.shape[0]
+
+        source_df = getSourceFolders(review_df.Filename, target_dir)
+        output_df = review_df.merge(source_df, how="inner", on="Filename")
+
+        output_df["OFFSET"] = [12*(int(p)-1) for p in output_df.Part]
+        output_df["TOP1DIST"] = round(output_df["TOP1DIST"], 5)
+        output_df["DURATION"] = 12
+        output_df["CHANNEL"] = 1
+        output_df["VOCALIZATIONS"] = 1
+        output_df["HOUR"] = ''
+        output_df["MANUAL_ID"] = ''
+
+        clip_timestamps = list(map(getClipTimestamp, output_df.IN_FILE, output_df.OFFSET))
+        clip_dates, clip_times = zip(*clip_timestamps)
+        output_df["DATE"] = clip_dates
+        output_df["TIME"] = clip_times
+
+        output_df["OFFSET_MMSS"] = [getReadableOffset(i) for i in output_df.OFFSET]
+
+        if timescale == "weekly":
+            output_df["SORT"] = ["{0}_Stn_{1}_Week_{2:02d}".format(*x) for x in zip(output_df.TOP1MATCH, output_df.Stn, output_df.Rec_Week)]
+        else:
+            output_df["SORT"] = ["{0}_Stn_{1}_Day_{2:03d}".format(*x) for x in zip(output_df.TOP1MATCH, output_df.Stn, output_df.Rec_Day)]
+
+        kscope_df = output_df[output_cols].sort_values(by=["TOP1MATCH", "IN_FILE", "PART"])
+
+    return kscope_df

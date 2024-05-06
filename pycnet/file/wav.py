@@ -9,10 +9,15 @@ from multiprocessing import JoinableQueue, Process, Queue
 
 
 def getWavLength(wav_path, mode='h'):
-    """Return the duration of the file at <wav_path> in hours or seconds. 
+    """Return the duration of a .wav file in hours or seconds. 
     
-    By default the duration will be expressed in hours; specify mode='s' to
-    return duration in seconds instead.
+    Arguments:
+    - wav_path: path to the .wav file.
+    - mode: units for the return value. Default is 'h' (hours). Set
+    mode='s' to return length in seconds.
+    
+    Returns:
+    Duration of the .wav file in hours or seconds.
     """
     try:
         with wave.open(wav_path) as w:
@@ -28,13 +33,17 @@ def getWavLength(wav_path, mode='h'):
 
 
 def makeSoxCmds(wav_path, output_dir):
-    """Generate SoX commands to create a set of spectrograms from <wav_file>.
+    """Generate SoX commands to create spectrograms from a .wav file.
     
-    Generate a list of SoX commands to create spectrograms for each 12 s
-    of audio in file at <wav_path>. Output files (PNG images) will be generated
-    in <output_dir>.
-    Can make this more flexible to allow for shorter and/or overlapping
-    audio segments.
+    Generate a list of SoX commands to create spectrograms representing
+    non-overlapping 12-s segments of audio from the .wav file provided.
+    
+    Arguments:
+    - wav_path: path to the .wav file.
+    - output_dir: folder where spectrogram files will be generated.
+    
+    Returns:
+    A list of commands to be executed by SoX.
     """
     wav_name = os.path.basename(wav_path)
     wav_length = getWavLength(wav_path, 's')
@@ -59,11 +68,20 @@ def makeSoxCmds(wav_path, output_dir):
 def makeSpectroDirList(wav_list, image_dir, n_chunks):
     """Map input .wav files to multiple output directories.
     
-    Facilitates parallel processing by breaking up the list of .wav files to 
-    be processed into <n_chunks> lists and enumerating a set of corresponding
-    output directories, then associating each .wav file with one output 
-    directory. Does not actually create the output folders. Return value is a 
-    list of tuples.
+    Divides the full list of .wav files to be processed into several
+    chunks and designates a folder to hold spectrograms from each chunk 
+    to facilitate parallel processing.
+    
+    Arguments:
+    - wav_list: a list of .wav files from which spectrograms will be 
+    generated.
+    - image_dir: the directory where spectrograms will be generated (in
+    subfolders as needed).
+    - n_chunks: the number of subfolders to create.
+    
+    Returns:
+    A list of tuples each containing the path to a .wav file and the
+    folder where spectrograms from that file will be generated.
     """
     chunk_size = int(len(wav_list) / n_chunks) + 1
     n_digits = int(math.log10(n_chunks)) + 1
@@ -76,13 +94,18 @@ def makeSpectroDirList(wav_list, image_dir, n_chunks):
 class WaveWorker(Process):
     """ Worker process to generate spectrograms from wave files.
     
-    <in_queue> contains tuples in the format (wav_path, spectro_dir).
-    <done_queue> contains paths of wav files that have already been processed;
-    size of <done_queue> is compared to the total number of wavs to build the
-    progress bar.
-    <output_dir> is the top level of the directory where spectrograms will be
-    generated; this will typically be split into chunks to be handled by 
-    parallel processes.
+    Arguments:
+    - in_queue: a Multiprocessing.JoinableQueue containing tuples in 
+    the format (wav_path, spectro_dir).
+    - done_queue: a Multiprocessing.Queue to hold paths of wav files 
+    that have already been processed, used to build a progress bar.
+    
+    Methods:
+    - run: get the next available item from in_queue, consisting of a
+    .wav file and an output directory. Generate a set of sox commands
+    to generate a set of spectrograms from the .wav file in the output
+    directory, then execute those commands. When finished, put the path
+    to the .wav file in done_queue.
     """
     def __init__(self, in_queue, done_queue, output_dir):
         Process.__init__(self)

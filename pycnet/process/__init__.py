@@ -24,7 +24,7 @@ import pycnet
 import tensorflow as tf
 
 from pycnet.cnet import v4_class_names, v5_class_names, v4_model_path, v5_model_path
-from pycnet.process import CLArgParser, TestPycnet
+from pycnet.process import CLArgParser
 
 
 def getWavPaths(wav_inventory, top_dir):

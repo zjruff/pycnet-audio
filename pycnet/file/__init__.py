@@ -10,31 +10,59 @@ from . import image
 from . import wav
 
 
-def findFiles(top_dir, ext):
-    """List all paths with extension <ext> under <top_dir>."""
+def findFiles(top_dir, file_ext):
+    """List all paths with a given extension in a director tree.
+    
+    Arguments:
+    - top_dir: path to the root of the directory tree to be searched.
+    - file_ext: file extension of files to look for. A leading dot (.) 
+    is not necessary but won't hurt anything.
+    
+    Returns:
+    - files_found: a sorted list of paths to files with extension 
+    file_ext in the directory tree rooted at top_dir.
+    """
     files_found = []
     for root, dirs, files in os.walk(top_dir):
         for file in files:
-            if file.split('.')[-1] == ext.replace('.', ''):
+            if file.split('.')[-1] == file_ext.replace('.', ''):
                 files_found.append(os.path.join(root, file))
     return sorted(files_found)
 
 
-def getFileSize(file_path, mode='gb'):
-    """Return the size of the file at <file_path> in human-readable units. 
+def getFileSize(file_path, units='gb'):
+    """Return the size of a file in human-readable units. 
     
     By default the file size will be returned in GB (gibibytes); other options
-    include MB, KB, and plain bytes. 
+    include MB, KB, and plain bytes.
+    
+    Arguments:
+    - file_path: path to the target file.
+    - units: units to use when reporting file size ('gb' for gibibytes,
+    'mb' for mebibytes, 'kb' for kibibytes, and 'b' for bytes).
+    
+    Returns:
+    - file_size: the size of the target file in the units specified.
     """
-    mode_key = {'gb':-3, 'mb':-2, 'kb':-1, 'b':0}
-    convert_exp = mode_key.get(mode, -3)
+    unit_key = {'gb':-3, 'mb':-2, 'kb':-1, 'b':0}
+    convert_exp = unit_key.get(units, -3)
     conversion = 1024**convert_exp
     file_size = os.path.getsize(file_path) * conversion
     return file_size
 
 
 def getFolder(file_path, top_dir):
-    """Return the folder of <file_path> relative to <top_dir>."""
+    """Return the location of a file relative to a higher-level folder.
+    
+    Arguments:
+    - file_path: path to the target file.
+    - top_dir: path to the folder that the reported location will be 
+    relative to.
+    
+    Returns:
+    - file_folder: a path to the folder containing file_path relative
+    to top_dir.
+    """
     file_dir = Path(file_path).parent
     top_dir_path = Path(top_dir)
     file_folder = file_dir.relative_to(top_dir_path)
@@ -44,10 +72,17 @@ def getFolder(file_path, top_dir):
 def makeFileInventory(path_list, top_dir, use_abs_path=False):
     """Build a table of basic attributes for a list of files.
     
-    Returns a Pandas DataFrame with one row for each file, listing the
-    directory (absolute or relative to <top_dir>), filename, size in 
-    bytes, and duration in seconds. Duration is obviously only relevant
-    to .wav files.
+    Arguments:
+    - path_list: list of paths of files to be examined.
+    - top_dir: the folder that will be used to create relative paths.
+    - use_abs_path: whether to list the full path of the folder 
+    containing each file in the Folder column of the resulting 
+    DataFrame.
+    
+    Returns:
+    - file_df: a Pandas DataFrame with one row for each .wav file 
+    listing its folder (absolute or relative to top_dir), filename, 
+    size in bytes, and duration in seconds.
     """
     top_path = Path(top_dir)
 
@@ -72,7 +107,15 @@ def makeFileInventory(path_list, top_dir, use_abs_path=False):
 
 
 def summarizeInventory(wav_inventory):
-    """Print a human-readable summary of the .wav file inventory."""
+    """Summarize a table of info on .wav files in human-readable form.
+    
+    Arguments:
+    - wav_inventory: a table of information on .wav files in a 
+    directory tree as produced by makeFileInventory() above.
+    
+    Returns:
+    Nothing.
+    """
     n_wav_files = len(wav_inventory)
     wav_lengths = wav_inventory["Duration"]
     wav_sizes = wav_inventory["Size"]
@@ -81,7 +124,19 @@ def summarizeInventory(wav_inventory):
 
 
 def inventoryFolder(target_dir, write_file=True, print_summary=True):
-    """Inventory .wav files in a folder and write the info to a file."""
+    """Inventory .wav files in a folder and write the info to a file.
+    
+    Arguments:
+    - target_dir: path of the top-level directory containing .wav files.
+    - write_file: whether to write the inventory table to a CSV file.
+    - print_summary: use summarizeInventory() to print a human-readable
+    summary of the .wav files that were found.
+    
+    Returns:
+    - wav_inventory: a Pandas DataFrame listing each .wav file in the 
+    directory tree, its path relative to target_dir, the size of the
+    file, and its duration in seconds.
+    """
     
     if not os.path.isdir(target_dir):
         print("\nNo valid target directory provided.\n")

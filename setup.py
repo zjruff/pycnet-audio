@@ -24,7 +24,8 @@ setuptools.setup(
             "generate_spectrograms = pycnet.process.GenerateSpectrograms:main",
             "generate_class_scores = pycnet.process.GenerateClassScores:main",
             "process_folder = pycnet.process.ProcessFolder:main",
-            "pycnet = pycnet.process:main"
+            "pycnet = pycnet.__main__:main",
+            "test_pycnet = pycnet.process.TestPycnet:main"
         ],
     },
     packages=setuptools.find_packages(),

@@ -20,4 +20,4 @@ from . import review
 
 
 from importlib.metadata import version
-__version__ = version("pycnet")
+__version__ = version("pycnet-audio")

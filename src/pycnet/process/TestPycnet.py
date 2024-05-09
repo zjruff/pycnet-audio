@@ -43,6 +43,9 @@ def generateToneFile(output_dir):
 def main():
     print("\nWelcome to pycnet! You are using version {0}.".format(pycnet.__version__))
 
+    print("\nThis test will determine if pycnet is working correctly.")
+    print("\n{0} Test begins below. {0}\n{1}".format("#" * 30, "#" * 80))
+
     test_dir = os.path.join(os.getcwd(), "pycnet_test")
 
     hex_dir = os.path.join(test_dir, "NON_99999")
@@ -70,7 +73,8 @@ def main():
         kscope_df = pd.read_csv(kscope_file_path)
         rev_lines = kscope_df.shape[0]
         if list(kscope_df.PART) == ["part_004", "part_018", "part_040"]:
-            print("\nTest complete. pycnet appears to be working correctly. Hooray!\n")
+            print("\n{0}\n{1} Test complete. {1}".format("#" * 80, "#" * 32))
+            print("\n\npycnet appears to be working correctly. Hooray!\n")
             rm_temp_dirs = input("Remove files and folders created for this test? [Y/n] ")
             if rm_temp_dirs.upper() != "N":
                 os.system("rmdir /s /q {0}".format(test_dir))

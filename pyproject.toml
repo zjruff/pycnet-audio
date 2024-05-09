@@ -1,0 +1,62 @@
+[build-system]
+requires = [
+    "setuptools >= 61",
+    "setuptools-scm >= 8.0"
+]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "pycnet-audio"
+version = "0.5.0"
+
+
+dependencies = [
+    "numpy==1.23",
+    "tensorflow-cpu==2.2",
+    "protobuf==3.20",
+    "pillow==8.2",
+    "pandas==1.4"
+]
+requires-python = ">= 3.8"
+
+
+authors = [{name = "Zack Ruff", email = "zjruff@gmail.com"}]
+maintainers = [{name = "Zack Ruff", email = "zjruff@gmail.com"}]
+description = "Audio processing with PNW-Cnet"
+readme = "README.md"
+license = {file = "LICENSE.md"}
+keywords = ["bioacoustics", "deep learning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent"
+]
+
+
+[project.urls]
+Documentation = "https://readthedocs.org"
+Repository = "https://github.com/zjruff/pycnet-audio"
+Issues = "https://github.com/zjruff/pycnet-audio/issues"
+
+
+[project.scripts]
+pycnet = "pycnet.__main__:main"
+test_pycnet = "pycnet.process.TestPycnet:main"
+
+
+[tool.setuptools]
+packages = [
+    "pycnet", 
+    "pycnet.cnet", 
+    "pycnet.file", 
+    "pycnet.process", 
+    "pycnet.prog", 
+    "pycnet.review"
+]
+package-dir = {"" = "src"}
+include-package-data = true
+package-data = {"pycnet.cnet" = ["PNW-Cnet_v4_TF.h5", "PNW-Cnet_v5_TF.h5", "target_classes.csv"]}

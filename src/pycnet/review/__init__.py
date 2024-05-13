@@ -25,6 +25,8 @@ classes in a set of class scores at a single threshold.
 classes from a set of class scores across a range of score thresholds.
 - makeReviewTable: produce a table of apparent detections of one or
 more target classes for manual review.
+- makeKscopeReviewTable: produce a table of apparent detections, 
+formatted to be exported as a CSV and browsed / tagged in Kaleidoscope.
 """
 
 from datetime import datetime, timedelta
@@ -101,10 +103,11 @@ def getClipTimestamp(source_file, offset):
     stamp_patt = re.compile("[0-9]{8}_[0-9]{6}")
     srcfile_str_stamp = stamp_patt.findall(source_file)[0]
     srcfile_stamp = datetime.strptime(srcfile_str_stamp, "%Y%m%d_%H%M%S")
-    clip_stamp = srcfile_stamp + timedelta(seconds=offset)
+    clip_stamp = srcfile_stamp + timedelta(seconds = offset)
     clip_date, clip_time = clip_stamp.strftime("%m-%d-%Y_%H:%M:%S").split('_')
     return (clip_date, clip_time)
-    
+
+
 def getReadableOffset(offset):
     """Convert offset in seconds to string in H:MM:SS or MM:SS format."""
     stamp = datetime(2000, 1, 1) + timedelta(seconds = offset)
@@ -181,14 +184,16 @@ def getSourceFolders(clip_list, top_dir):
     """
     
     source_file_list, part_list = zip(*[getSourceFile(clip) for clip in clip_list])
-    
-    wav_paths = pycnet.file.findFiles(top_dir, ".wav")
-    wav_dirs, wav_names = zip(*[os.path.split(path) for path in wav_paths])
-    wav_folders = [str(Path(dir).relative_to(top_dir)) for dir in wav_dirs]
-    
     source_file_df = pd.DataFrame(data={"Filename": clip_list, "IN_FILE": source_file_list, "PART": part_list})
-    wav_df = pd.DataFrame(data={"Path": wav_paths, "IN_FILE": wav_names, "FOLDER": wav_folders})
     
+    wav_inv_path = os.path.join(top_dir, "{0}_wav_inventory.csv".format(os.path.basename(top_dir)))
+    if not os.path.exists(wav_inv_path):
+        wav_df = pycnet.file.inventoryFolder(top_dir)
+    else:
+        wav_df = pd.read_csv(wav_inv_path)
+
+    wav_df.rename(columns={"Folder": "FOLDER", "Filename": "IN_FILE"}, inplace=True)
+
     joined_df = source_file_df.merge(wav_df, how="left", on="IN_FILE")
     
     if joined_df.shape[0] != source_file_df.shape[0]:
@@ -374,12 +379,6 @@ def summarizeDetections(pred_table, n_workers=None):
     return det_df
 
 
-# Working pretty well but need to figure out how to handle rows that meet
-# the threshold for >1 class. Currently rows will appear once for every
-# class for which they meet the threshold - figure out how to collapse
-# those to a single label based on the order of classes in review_settings.
-# - Can sort by the index of each column in the review_settings keys, then
-# use DataFrame.drop_duplicates(keep='first').
 def makeReviewTable(pred_table, cnet_version="v5", review_settings=None):
     """Extract apparent detections from a set of class scores.
     

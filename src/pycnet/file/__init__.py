@@ -1,4 +1,23 @@
-""" Contains various file-handling functions. """
+""" Contains various file-handling functions. 
+
+Functions:
+- findFiles: List all paths with a given extension in a directory tree.
+- getFileSize: Return the size of a file in human-readable units.
+- getFolder: Return the location of a file relative to a higher-level 
+folder.
+- makeFileInventory: Build a table of basic attributes for a list of 
+files.
+- summarizeInventory: Summarize a table of info on .wav files in human-
+readable form.
+- inventoryFolder: Inventory .wav files in a folder and write the info 
+to a file.
+- buildFilename: Construct a filename using a prefix and a timestamp.
+- renameFiles: Rename files based on values in a DataFrame.
+- massRenameFiles: Rename files with a given extension in a directory 
+tree (or undo this operation if previously performed).
+- removeSpectroDir: Recursively remove temporary files and folders.
+
+"""
 
 import datetime as dt
 import os
@@ -11,7 +30,7 @@ from . import wav
 
 
 def findFiles(top_dir, file_ext):
-    """List all paths with a given extension in a director tree.
+    """List all paths with a given extension in a directory tree.
     
     Arguments:
     - top_dir: path to the root of the directory tree to be searched.
@@ -121,6 +140,7 @@ def summarizeInventory(wav_inventory):
     wav_sizes = wav_inventory["Size"]
     total_dur, total_gb = sum(wav_lengths) / 3600., sum(wav_sizes) / 1024.**3
     print("\nFound {0} wav files.\nTotal duration: {1:.1f} h\nTotal size: {2:.1f} GB\n".format(n_wav_files, total_dur, total_gb))
+    return
 
 
 def inventoryFolder(target_dir, write_file=True, print_summary=True):
@@ -279,7 +299,7 @@ def massRenameFiles(top_dir, extension, prefix=''):
             print("\n{0} of {1} {2} files were renamed.\n".format(rename_count, n_files, extension))
             rename_log_df.to_csv(rename_log_path, index=False)
             print("Results written to {0}.\n".format(rename_log_path))
-    
+
     return
 
 
@@ -296,7 +316,11 @@ def removeSpectroDir(target_dir, spectro_dir=None):
         print("Temporary folder not found.")
     else:
         print("\nRemoving temporary folders...", end='')
-        os.system("rmdir /s /q {0}".format(os.path.dirname(image_dir)))
+        if os.name == "nt":
+            os.system("rmdir /s /q {0}".format(os.path.dirname(image_dir)))
+        else: 
+            # os.name should be 'posix' on both Linux and MacOS 
+            os.system("rm -rf {0}".format(os.path.dirname(image_dir)))
         print(" done.\n")
     
     return

@@ -324,7 +324,7 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         spectro_end = dt.datetime.now()
         print("\nFinished {0}.".format(spectro_end.strftime(time_fmt)))
     
-    ### Generate class scores for each image and summarize apparent detections ###
+    ### Generate class scores for each image ###
     if mode in ["process", "predict"]:
         
         predict_start = dt.datetime.now()
@@ -343,41 +343,40 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         print("\nFinished {0}.".format(predict_end.strftime(time_fmt)))
         print("\nClass scores written to {0}.\n".format(class_score_file))
     
-        ### Generate review files and summarize apparent detections ###
-        print("Summarizing apparent detections...", end='')
-        detection_summary = pycnet.review.summarizeDetections(class_scores)
-        print(" done.")
-        
-        detection_summary.to_csv(det_sum_file, index=False)
-        print("Detection summary written to {0}.\n".format(det_sum_file))
-    
-    ### Generate review files containing apparent detections ###
+    ### Summarize apparent detections and create review file ###
     if mode in ["process", "predict", "review"]:
-        print("Generating review file...", end='')
-        
         try:
             class_scores
         except:
             class_scores = pycnet.review.readPredFile(class_score_file)
-            
+
+        print("Summarizing apparent detections...", end='')
+        detection_summary = pycnet.review.summarizeDetections(class_scores)
+        print(" done.\n")
+        
+        detection_summary.to_csv(det_sum_file, index=False)
+        print("Detection summary written to {0}.\n".format(det_sum_file))
+    
+        print("Generating review file...", end='')
+    
         review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version)
         n_review_rows = review_df.shape[0]
         
         review_df.to_csv(kscope_file, index=False)
         print(" done.\n")
-    
+
         if n_review_rows == 0:
             print("No apparent detections found with these review criteria.") 
             print("Empty table written to {0}.\n".format(kscope_file))
         else:
             print("{0} apparent detections written to {1}.\n".format(n_review_rows, kscope_file))
-    
+
     ### Clean up temporary files and folders ###
     if any([mode == "cleanup", cleanup]):
         pycnet.file.removeSpectroDir(target_dir, spectro_dir)
-    
+
     proc_end = dt.datetime.now()
-    
+
     ### Calculate processing speed ###
     if mode == "process":
         d_hours = sum(wav_inventory["Duration"]) / 3600.

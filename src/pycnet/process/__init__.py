@@ -293,36 +293,56 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
     review_file = os.path.join(target_dir, "{0}_review.csv".format(output_prefix))
     kscope_file = review_file.replace("review", "review_kscope")
     
+    output_files = []
+    
     ### Inventory .wav files and set up processing directories ###
     if not os.path.exists(wav_inv_file):
         print("Creating inventory file {0}.".format(wav_inv_file))
         wav_inventory = pycnet.file.inventoryFolder(target_dir)
+        output_files.append(wav_inv_file)
     else:
         print("Using inventory file {0}.".format(wav_inv_file))
         wav_inventory = pd.read_csv(wav_inv_file)
         pycnet.file.summarizeInventory(wav_inventory)
-    
+
+    proc_start = dt.datetime.now()
+
     if spectro_dir is None:
         image_dir = os.path.join(target_dir, "Temp", "images")
     else:
         image_dir = os.path.join(spectro_dir, folder_name, "images")
     
-    proc_start = dt.datetime.now()
-    
     ### Generate the spectrograms ###
     if mode in ["process", "spectro"]:
-    
+
+        # Check if it's possible to generate spectrograms
+        try:
+            os.makedirs(image_dir)
+        except:
+            print("\nCould not create temporary directory in the location requested!")
+            print("Aborting operation.\n")
+            exit()
+        
         proc_queue = buildProcQueue(target_dir, image_dir)
         print("Spectrograms will be generated in the following folders:")
-        print('\n'.join(sorted(proc_queue["dirs"])) + '\n')
+        print('\n'.join(sorted(proc_queue["dirs"])))
         
-        print("Generating spectrograms starting {0}...\n".format(proc_start.strftime(time_fmt)))
+        n_cores = mp.cpu_count()
+        if n_workers is None:
+            n_workers_corr = n_cores
+        else:
+            int_workers = int(n_workers)
+            if not 1 <= int_workers <= n_cores:
+                n_workers_corr = n_cores
+                print("Cannot use {0} worker processes. Using {1} processes.".format(n_workers, n_workers_corr))
+            else:
+                n_workers_corr = int_workers
         
-        n_workers = n_workers if n_workers else mp.cpu_count()
-        generateSpectrograms(proc_queue, n_workers, show_prog)
+        print("\nGenerating spectrograms starting {0}...\n".format(proc_start.strftime(time_fmt)))
+        generateSpectrograms(proc_queue, n_workers_corr, show_prog)
         
         spectro_end = dt.datetime.now()
-        print("\nFinished {0}.".format(spectro_end.strftime(time_fmt)))
+        print("Finished {0}.".format(spectro_end.strftime(time_fmt)))
     
     ### Generate class scores for each image ###
     if mode in ["process", "predict"]:
@@ -341,8 +361,8 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         
         predict_end = dt.datetime.now()
         print("\nFinished {0}.".format(predict_end.strftime(time_fmt)))
-        print("\nClass scores written to {0}.\n".format(class_score_file))
-    
+        output_files.append(class_score_file)
+
     ### Summarize apparent detections and create review file ###
     if mode in ["process", "predict", "review"]:
         try:
@@ -353,23 +373,17 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         print("Summarizing apparent detections...", end='')
         detection_summary = pycnet.review.summarizeDetections(class_scores)
         print(" done.\n")
-        
-        detection_summary.to_csv(det_sum_file, index=False)
-        print("Detection summary written to {0}.\n".format(det_sum_file))
-    
-        print("Generating review file...", end='')
-    
-        review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version)
-        n_review_rows = review_df.shape[0]
-        
-        review_df.to_csv(kscope_file, index=False)
-        print(" done.\n")
 
-        if n_review_rows == 0:
-            print("No apparent detections found with these review criteria.") 
-            print("Empty table written to {0}.\n".format(kscope_file))
-        else:
-            print("{0} apparent detections written to {1}.\n".format(n_review_rows, kscope_file))
+        detection_summary.to_csv(det_sum_file, index=False)
+        output_files.append(det_sum_file)
+
+        print("Generating review file...", end='')
+
+        review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version)
+        print(" done. {0} apparent detections found.\n".format(review_df.shape[0]))
+
+        review_df.to_csv(kscope_file, index=False)
+        output_files.append(kscope_file)
 
     ### Clean up temporary files and folders ###
     if any([mode == "cleanup", cleanup]):
@@ -377,11 +391,15 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
 
     proc_end = dt.datetime.now()
 
-    ### Calculate processing speed ###
+    ### Report output files and processing speed ###    
+    if len(output_files) > 0:
+        print("Created the following output files in {0}: ".format(target_dir))
+        print('\n'.join([os.path.basename(f) for f in output_files]) + '\n')
+
     if mode == "process":
         d_hours = sum(wav_inventory["Duration"]) / 3600.
         p_hours = (proc_end - proc_start).seconds / 3600.
         dp_ratio = d_hours / p_hours
-        print("Processed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})".format(d_hours, p_hours, dp_ratio))
+        print("Processed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})\n".format(d_hours, p_hours, dp_ratio))
 
     return

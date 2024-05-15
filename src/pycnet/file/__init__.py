@@ -173,7 +173,6 @@ def inventoryFolder(target_dir, write_file=True, print_summary=True):
         
         if write_file:
             wav_inventory.to_csv(inv_file, index=False)
-            print("File information written to {0}.\n".format(inv_file))
     
     return wav_inventory
 
@@ -315,7 +314,7 @@ def removeSpectroDir(target_dir, spectro_dir=None):
     if not os.path.exists(image_dir):
         print("Temporary folder not found.")
     else:
-        print("\nRemoving temporary folders...", end='')
+        print("Removing temporary folders...", end='')
         if os.name == "nt":
             os.system("rmdir /s /q {0}".format(os.path.dirname(image_dir)))
         else: 

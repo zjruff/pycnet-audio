@@ -50,11 +50,11 @@ def parsePycnetArgs():
     parser.add_argument("-o", dest="output_file", type=str,
         help="Manually specify output filename.")
 
-    parser.add_argument("-q", dest="quiet_mode",
+    parser.add_argument("-q", dest="quiet_mode", action="store_true",
         help="Quiet mode (suppress progress bars and informational messages).")
 
-    # parser.add_argument("-a", dest="auto_cleanup",
-        # help="Remove spectrogram image files and temporary folders when class scores have been generated.")
+    parser.add_argument("-a", dest="auto_cleanup", action="store_true",
+        help="Remove spectrogram image files and temporary folders when class scores have been generated.")
 
     args = parser.parse_args()
     

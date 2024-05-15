@@ -30,8 +30,11 @@ def main():
         print('\n'.join(valid_modes))
 
     else:
+        show_prog = not args.quiet_mode
+        auto_cleanup = args.auto_cleanup
+        
         if args.mode == "process":
-            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers, args.review_settings]
+            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers, args.review_settings, show_prog, auto_cleanup]
             pycnet.process.processFolder(*proc_args)
 
         elif args.mode == "spectro":

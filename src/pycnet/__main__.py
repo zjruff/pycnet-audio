@@ -20,10 +20,9 @@ def main():
     Run with the -h (help) flag, e.g. 'pycnet -h', to see all options.
     """
 
-    # valid_modes = ["rename", "inventory", "spectro", "predict", "review", "process", "cleanup", "config"]
     valid_modes = ["process", "spectro", "predict", "review", "inventory", "rename", "cleanup"]
 
-    args = pycnet.process.CLArgParser.parsePycnetArgs()
+    args = pycnet.process.parsePycnetArgs()
 
     if not args.mode in valid_modes:
         print("\nMode '{0}' not recognized. Please use one of the following options:".format(args.mode))
@@ -34,20 +33,20 @@ def main():
         auto_cleanup = args.auto_cleanup
         
         if args.mode == "process":
-            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers, args.review_settings, show_prog, auto_cleanup]
-            pycnet.process.processFolder(*proc_args)
+            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers, args.review_settings]
+            pycnet.process.processFolder(*proc_args, show_prog=show_prog, cleanup=auto_cleanup)
 
         elif args.mode == "spectro":
             spectro_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers]
-            pycnet.process.processFolder(*spectro_args, cleanup=False)
+            pycnet.process.processFolder(*spectro_args, show_prog=show_prog, cleanup=auto_cleanup)
 
         elif args.mode == "predict":
             predict_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir]
-            pycnet.process.processFolder(*predict_args, cleanup=False)
+            pycnet.process.processFolder(*predict_args, show_prog=show_prog, cleanup=auto_cleanup)
 
         elif args.mode == "review":
             review_args = [args.mode, args.target_dir, args.cnet_version]
-            pycnet.process.processFolder(*review_args, cleanup=False)
+            pycnet.process.processFolder(*review_args, cleanup=auto_cleanup)
 
         elif args.mode == "inventory":
             inv_args = [args.target_dir]

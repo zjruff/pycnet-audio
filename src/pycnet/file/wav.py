@@ -1,4 +1,24 @@
-"""Defines functions for processing .wav audio files."""
+"""Defines functions and classes for processing .wav audio files.
+
+Functions:
+
+    getWavLength
+        Measure the duration of a .wav file.
+
+    makeSoxCmds
+        Build a set of commands to be executed by SoX to generate 
+        spectrograms from a .wav file.
+
+    makeSpectroDirList 
+        Map a set of .wav files to a set of temporary output 
+        directories where spectrograms will be generated.
+
+Classes:
+
+    wavWorker
+        Worker process that generates spectrograms from audio files 
+        using SoX.
+"""
 
 import datetime as dt
 import math
@@ -11,14 +31,19 @@ from multiprocessing import JoinableQueue, Process, Queue
 def getWavLength(wav_path, mode='h'):
     """Return the duration of a .wav file in hours or seconds. 
     
-    Arguments:
-    - wav_path: path to the .wav file.
-    - mode: units for the return value. Default is 'h' (hours). Set
-    mode='s' to return length in seconds.
+    Args:
+    
+        wav_path (str): Path to the .wav file.
+        
+        mode (str): Units for the return value. Default is 'h' (hours).
+            Set mode='s' to return duration in seconds.
     
     Returns:
-    Duration of the .wav file in hours or seconds.
+        
+        float: Duration of the .wav file in hours or seconds, or 0 if
+        the file's duration could not be determined.
     """
+
     try:
         with wave.open(wav_path) as w:
             nframes, framerate = w.getnframes(), w.getframerate()
@@ -35,16 +60,21 @@ def getWavLength(wav_path, mode='h'):
 def makeSoxCmds(wav_path, output_dir):
     """Generate SoX commands to create spectrograms from a .wav file.
     
-    Generate a list of SoX commands to create spectrograms representing
-    non-overlapping 12-s segments of audio from the .wav file provided.
+    Generates a list of SoX commands to create spectrograms representing
+    segments of audio from the .wav file provided.
     
-    Arguments:
-    - wav_path: path to the .wav file.
-    - output_dir: folder where spectrogram files will be generated.
+    Args:
+    
+        wav_path (str): Path to the .wav file.
+        
+        output_dir (str): Path to the folder where spectrogram files 
+            will be generated.
     
     Returns:
-    A list of commands to be executed by SoX.
+    
+        list[str]: A list of commands to be executed by SoX.
     """
+    
     wav_name = os.path.basename(wav_path)
     wav_length = getWavLength(wav_path, 's')
     n_segments = int(wav_length / 12) + 1
@@ -72,17 +102,23 @@ def makeSpectroDirList(wav_list, image_dir, n_chunks):
     chunks and designates a folder to hold spectrograms from each chunk 
     to facilitate parallel processing.
     
-    Arguments:
-    - wav_list: a list of .wav files from which spectrograms will be 
-    generated.
-    - image_dir: the directory where spectrograms will be generated (in
-    subfolders as needed).
-    - n_chunks: the number of subfolders to create.
+    Args:
+    
+        wav_list (list): List of paths to .wav files from which 
+            spectrograms will be generated.
+        
+        image_dir (str): Path to the directory where spectrograms will
+            be generated (in subfolders as needed).
+        
+        n_chunks (int): The number of subfolders to create.
     
     Returns:
-    A list of tuples each containing the path to a .wav file and the
-    folder where spectrograms from that file will be generated.
+        
+        list: A list of tuples (wav_path, output_dir), each containing 
+        the path to a .wav file and the folder where spectrograms from
+        that file will be generated.
     """
+    
     chunk_size = int(len(wav_list) / n_chunks) + 1
     n_digits = int(math.log10(n_chunks)) + 1
     wav_chunks = [int(i / chunk_size) + 1 for i in range(len(wav_list))]
@@ -93,26 +129,48 @@ def makeSpectroDirList(wav_list, image_dir, n_chunks):
 
 class WaveWorker(Process):
     """ Worker process to generate spectrograms from wave files.
+
+    When running, the worker will fetch the next available item from 
+    in_queue, consisting of a .wav file and an output directory. 
+    It will create a set of sox commands to generate a set of 
+    spectrograms from the .wav file in the output directory, then 
+    execute those commands sequentially using os.system. When finished,
+    the path to the .wav file will be placed in done_queue.
     
-    Arguments:
-    - in_queue: a Multiprocessing.JoinableQueue containing tuples in 
-    the format (wav_path, spectro_dir).
-    - done_queue: a Multiprocessing.Queue to hold paths of wav files 
-    that have already been processed, used to build a progress bar.
-    
-    Methods:
-    - run: get the next available item from in_queue, consisting of a
-    .wav file and an output directory. Generate a set of sox commands
-    to generate a set of spectrograms from the .wav file in the output
-    directory, then execute those commands. When finished, put the path
-    to the .wav file in done_queue.
+    Attributes:
+        
+        in_queue (Multiprocessing.JoinableQueue): Queue containing 
+            tuples in the format (wav_path, output_dir).
+        
+        done_queue (Multiprocessing.Queue): Queue to hold paths to .wav
+            files that have already been processed.
+        
+        output_dir (str): Path to the directory where spectrograms 
+            should be generated.
     """
+
     def __init__(self, in_queue, done_queue, output_dir):
+        """Initializes the instance with input and output queues.
+        
+        Args:
+            
+            in_queue (multiprocessing.JoinableQueue): Queue containing
+                input data in the form of tuples (wav_path, 
+                output_dir). 
+            
+            done_queue (multiprocessing.Queue: Queue where paths to 
+                .wav files that have already been processed should go.
+            
+            output_dir (str): Path to the directory where spectrograms
+                should be generated.
+        """
+
         Process.__init__(self)
         self.in_queue = in_queue
         self.done_queue = done_queue
         self.output_dir = output_dir
-    
+
+
     def run(self):
         while True:
             wav_path, spectro_dir = self.in_queue.get()

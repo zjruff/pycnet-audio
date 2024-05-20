@@ -1,21 +1,38 @@
-""" Contains various file-handling functions. 
+"""Defines functions for various file handling tasks. 
 
 Functions:
-- findFiles: List all paths with a given extension in a directory tree.
-- getFileSize: Return the size of a file in human-readable units.
-- getFolder: Return the location of a file relative to a higher-level 
-folder.
-- makeFileInventory: Build a table of basic attributes for a list of 
-files.
-- summarizeInventory: Summarize a table of info on .wav files in human-
-readable form.
-- inventoryFolder: Inventory .wav files in a folder and write the info 
-to a file.
-- buildFilename: Construct a filename using a prefix and a timestamp.
-- renameFiles: Rename files based on values in a DataFrame.
-- massRenameFiles: Rename files with a given extension in a directory 
-tree (or undo this operation if previously performed).
-- removeSpectroDir: Recursively remove temporary files and folders.
+    
+    findFiles
+        List all paths with a given extension in a directory 
+        tree.
+    
+    getFileSize
+        Return the size of a file in human-readable units.
+    
+    getFolder
+        Return the location of a file relative to a higher-level
+        folder.
+    
+    makeFileInventory
+        Build a table of basic attributes for a list of files.
+    
+    summarizeInventory
+        Summarize a table of info on .wav files in human-readable form.
+    
+    inventoryFolder
+        Inventory .wav files in a folder and write the info to a file.
+    
+    buildFilename
+        Construct a filename using a prefix and a timestamp.
+    
+    renameFiles
+        Rename files based on values in a DataFrame.
+    
+    massRenameFiles
+        Rename files with a given extension in a directory tree (or 
+        undo this operation if previously performed).
+    
+    removeSpectroDir: Recursively remove temporary files and folders.
 
 """
 
@@ -30,17 +47,21 @@ from . import wav
 
 
 def findFiles(top_dir, file_ext):
-    """List all paths with a given extension in a directory tree.
-    
-    Arguments:
-    - top_dir: path to the root of the directory tree to be searched.
-    - file_ext: file extension of files to look for. A leading dot (.) 
-    is not necessary but won't hurt anything.
-    
+    """List all files with a given extension in a directory tree.
+
+    Args:
+
+        top_dir: Path to the root of the directory tree to be searched.
+
+        file_ext: File extension of files to look for. A leading dot 
+            (.) is not necessary but will not hurt anything.
+
     Returns:
-    - files_found: a sorted list of paths to files with extension 
-    file_ext in the directory tree rooted at top_dir.
+
+        list[str]: A sorted list of paths to files with extension 
+        file_ext in the directory tree rooted at top_dir.
     """
+
     files_found = []
     for root, dirs, files in os.walk(top_dir):
         for file in files:
@@ -51,18 +72,23 @@ def findFiles(top_dir, file_ext):
 
 def getFileSize(file_path, units='gb'):
     """Return the size of a file in human-readable units. 
-    
-    By default the file size will be returned in GB (gibibytes); other options
-    include MB, KB, and plain bytes.
-    
-    Arguments:
-    - file_path: path to the target file.
-    - units: units to use when reporting file size ('gb' for gibibytes,
-    'mb' for mebibytes, 'kb' for kibibytes, and 'b' for bytes).
-    
+
+    By default the file size will be returned in GB (gibibytes); other 
+    options include MB, KB, and plain bytes.
+
+    Args:
+
+        file_path: path to the target file.
+
+        units: units to use when reporting file size ('gb' for 
+            gibibytes, 'mb' for mebibytes, 'kb' for kibibytes, and 'b'
+            for bytes).
+
     Returns:
-    - file_size: the size of the target file in the units specified.
+
+        float: The size of the target file in the units specified.
     """
+    
     unit_key = {'gb':-3, 'mb':-2, 'kb':-1, 'b':0}
     convert_exp = unit_key.get(units, -3)
     conversion = 1024**convert_exp
@@ -72,16 +98,19 @@ def getFileSize(file_path, units='gb'):
 
 def getFolder(file_path, top_dir):
     """Return the location of a file relative to a higher-level folder.
-    
-    Arguments:
-    - file_path: path to the target file.
-    - top_dir: path to the folder that the reported location will be 
-    relative to.
-    
+
+    Args:
+
+        file_path (str): Path to the target file.
+
+        top_dir (str): Path to the folder relative to which the file's 
+            location will be reported.
+
     Returns:
-    - file_folder: a path to the folder containing file_path relative
-    to top_dir.
+        str: Path to the folder containing file_path relative to 
+        top_dir.
     """
+
     file_dir = Path(file_path).parent
     top_dir_path = Path(top_dir)
     file_folder = file_dir.relative_to(top_dir_path)
@@ -90,19 +119,25 @@ def getFolder(file_path, top_dir):
 
 def makeFileInventory(path_list, top_dir, use_abs_path=False):
     """Build a table of basic attributes for a list of files.
-    
-    Arguments:
-    - path_list: list of paths of files to be examined.
-    - top_dir: the folder that will be used to create relative paths.
-    - use_abs_path: whether to list the full path of the folder 
-    containing each file in the Folder column of the resulting 
-    DataFrame.
-    
+
+    Args:
+
+        path_list (list): List of paths of files to be examined.
+
+        top_dir (str): Path to the folder that will be used to create 
+            relative paths.
+
+        use_abs_path (bool): Whether to list the full path of the 
+            folder containing each file in the Folder column of the 
+            resulting DataFrame.
+
     Returns:
-    - file_df: a Pandas DataFrame with one row for each .wav file 
-    listing its folder (absolute or relative to top_dir), filename, 
-    size in bytes, and duration in seconds.
+
+        Pandas.DataFrame: DataFrame with one row for each .wav file 
+            listing its folder (absolute or relative to top_dir), 
+            filename, size in bytes, and duration in seconds.
     """
+
     top_path = Path(top_dir)
 
     file_dict = {"Folder":[], "Filename":[], "Size":[], "Duration":[]}
@@ -127,14 +162,18 @@ def makeFileInventory(path_list, top_dir, use_abs_path=False):
 
 def summarizeInventory(wav_inventory):
     """Summarize a table of info on .wav files in human-readable form.
-    
-    Arguments:
-    - wav_inventory: a table of information on .wav files in a 
-    directory tree as produced by makeFileInventory() above.
-    
+
+    Args:
+
+        wav_inventory (Pandas.DataFrame): DataFrame containing 
+            information on .wav files in a directory tree, as produced 
+            by makeFileInventory.
+
     Returns:
-    Nothing.
+
+        Nothing.
     """
+
     n_wav_files = len(wav_inventory)
     wav_lengths = wav_inventory["Duration"]
     wav_sizes = wav_inventory["Size"]
@@ -145,19 +184,25 @@ def summarizeInventory(wav_inventory):
 
 def inventoryFolder(target_dir, write_file=True, print_summary=True):
     """Inventory .wav files in a folder and write the info to a file.
-    
-    Arguments:
-    - target_dir: path of the top-level directory containing .wav files.
-    - write_file: whether to write the inventory table to a CSV file.
-    - print_summary: use summarizeInventory() to print a human-readable
-    summary of the .wav files that were found.
-    
+
+    Args:
+
+        target_dir (str): Path of the top-level directory containing 
+            .wav files.
+
+        write_file (bool): Whether to write the inventory table to a 
+            CSV file.
+
+        print_summary (bool): whether to use summarizeInventory to 
+            print a human-readable summary of the .wav files that were
+            found.
+
     Returns:
-    - wav_inventory: a Pandas DataFrame listing each .wav file in the 
-    directory tree, its path relative to target_dir, the size of the
-    file, and its duration in seconds.
+        Pandas.DataFrame: DataFrame listing each .wav file in the 
+        directory tree, its path relative to target_dir, the size of 
+        the file, and its duration in seconds.
     """
-    
+
     if not os.path.isdir(target_dir):
         print("\nNo valid target directory provided.\n")
         return
@@ -179,13 +224,25 @@ def inventoryFolder(target_dir, write_file=True, print_summary=True):
 
 def buildFilename(file_path, prefix=''):
     """Construct a filename using a prefix and a timestamp.
-    
-    If provided, <prefix> will be used by itself. If no prefix is
-    provided, it will be constructed based on the lowest two levels
-    of directories containing the file.
+
+    If no prefix is provided, a prefix will be constructed based on the
+    two lowest-level directories containing the file (i.e., the file's 
+    grandparent and parent directories).
+
     If the filename does not already have a timestamp in the right
     format, it will be generated based on the file's modification time.
+
+    Args:
+
+        file_path (str): Full path to the file to be renamed.
+
+        prefix (str): Prefix component of the filename to be generated.
+
+    Returns:
+
+        str: Path to the file following renaming.
     """
+
     p = Path(file_path)
     file_dir = p.parent
     
@@ -215,11 +272,23 @@ def buildFilename(file_path, prefix=''):
 
 def renameFiles(rename_log_df, revert=False):
     """Rename files based on values in a DataFrame.
-    
-    Returns an integer value which is -1 if the attempted renaming
-    operation would result in duplicate filenames, or the number of
-    files that were successfully renamed.
+
+    Args:
+
+        rename_log_df (Pandas.DataFrame): DataFrame listing the 
+            directory, current filenames, and future filenames for a 
+            set of files.
+
+        revert (bool): Whether to run in "undo mode" to reverse a 
+            previous renaming operation.
+
+    Returns:
+
+        int: The number of files that were successfully renamed, or -1
+        if the renaming operation would have resulted in duplicate 
+        filenames.
     """
+
     n_files = len(rename_log_df)
     dirs = rename_log_df["Folder"]
     old_names = rename_log_df["Old_Name"]
@@ -248,11 +317,26 @@ def renameFiles(rename_log_df, revert=False):
 
 
 def massRenameFiles(top_dir, extension, prefix=''):
-    """Rename files with a given extension in a directory tree.
-    
+    """Rename all files with a given extension in a directory tree.
+
     Runs in 'undo mode' if a file called Rename_Log.csv already exists 
     in the directory provided.
+
+    Args:
+
+        top_dir (str): Path to the root of the directory tree 
+            containing files to be renamed.
+
+        extension (str): File extension of files to be found and 
+            renamed.
+
+        prefix (str): A prefix to use when constructing filenames.
+
+    Returns:
+
+        Nothing.
     """
+    
     rename_log_path = os.path.join(top_dir, "Rename_Log.csv")
     
     if os.path.exists(rename_log_path):
@@ -303,7 +387,21 @@ def massRenameFiles(top_dir, extension, prefix=''):
 
 
 def removeSpectroDir(target_dir, spectro_dir=None):
-    """Recursively remove temporary files and folders."""
+    """Recursively remove temporary files and folders.
+
+    Args:
+
+        target_dir (str): Path to the folder containing audio data from
+            which spectrograms were generated.
+
+        spectro_dir (str): Path to the folder where the temporary 
+            spectrogram folder was created (defaults to target_dir).
+
+    Returns:
+
+        Nothing.
+    """
+    
     folder_name = os.path.basename(target_dir)
     
     if not spectro_dir:

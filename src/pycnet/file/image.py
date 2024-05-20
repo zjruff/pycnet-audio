@@ -1,4 +1,19 @@
-"""Defines functions for processing image files (spectrograms)."""
+"""Defines functions for processing image files (spectrograms).
+
+Functions:
+
+    checkImageFile
+        Verify that an image file can be loaded.
+
+    checkImages
+        Use a set of worker processes to check all the image files in a
+        directory tree.
+    
+Classes:
+
+    ImageChecker
+        Worker process that checks whether image files can be loaded.
+"""
 
 import multiprocessing as mp
 import os
@@ -8,7 +23,17 @@ from tensorflow.keras.preprocessing.image import load_img
 
 
 def checkImageFile(image_path):
-    """Verify that tensorflow can load an image file."""
+    """Verify that TensorFlow can load an image file.
+
+    Args:
+
+        image_path (str): path to the image file that will be loaded.
+
+    Returns:
+
+        bool: True if the image loaded successfully, otherwise False.
+    """
+
     try:
         img = load_img(image_path)
         return True
@@ -16,35 +41,23 @@ def checkImageFile(image_path):
         return False
 
 
-class imageChecker(mp.Process):
-    """Worker process to check for bad image files.
-    """
-    def __init__(self, in_queue, bad_queue):
-        mp.Process.__init__(self)
-        self.in_queue = in_queue
-        self.bad_queue = bad_queue
-        
-    def run(self):
-        while True:
-            img_path = self.in_queue.get()
-            img_loads = checkImageFile(img_path)
-            if not img_loads:
-                self.bad_queue.put(img_path)
-            self.in_queue.task_done()
-
-
 def checkImages(top_dir, n_workers=0):
     """Check all the .png images in a folder.
     
     Arguments:
-    - top_dir: the directory containing images to be checked
-    - n_workers: number of worker processes to use. Defaults to number
-    of available cores.
+        
+        top_dir (str): Path to the root of the directory tree 
+            containing image files to be checked.
+        
+        n_workers (int): number of worker processes to use. Defaults to
+            the number of logical CPU cores.
     
     Returns:
-    - bad_imgs: a sorted list of paths of images that could not be 
-    loaded for any reason
+        
+        list: A sorted list of paths to image files that could not be 
+        loaded for any reason.
     """
+    
     if n_workers == 0:
         n_workers = mp.cpu_count()
     else:
@@ -59,7 +72,7 @@ def checkImages(top_dir, n_workers=0):
         img_queue.put(i)
         
     for j in range(n_workers):
-        worker = imageChecker(img_queue, bad_img_queue)
+        worker = ImageChecker(img_queue, bad_img_queue)
         worker.daemon = True
         worker.start()
         
@@ -82,3 +95,44 @@ def checkImages(top_dir, n_workers=0):
     
     return sorted(bad_imgs)
 
+
+class ImageChecker(mp.Process):
+    """Worker that checks for bad image files.
+    
+    Fetches image paths from self.in_queue and checks them using 
+    checkImageFiles(). Paths of image files that could not be loaded 
+    are placed in self.bad_queue. Process will run until its in_queue
+    is empty.
+    
+    Attributes:
+        
+        in_queue (multiprocessing.JoinableQueue): Queue containing 
+            paths to image files to be checked.
+        
+        bad_queue (multiprocessing.Queue): Queue to hold paths to image
+            files that could not be loaded.
+    """
+
+    def __init__(self, in_queue, bad_queue):
+        """Initializes the instance with input and output queues.
+        
+        Args:
+            
+            in_queue (multiprocessing.JoinableQueue): Queue listing 
+                image files to check.
+            
+            bad_queue (multiprocessing.Queue): Queue where paths to bad
+                image files should go.
+        """
+        mp.Process.__init__(self)
+        self.in_queue = in_queue
+        self.bad_queue = bad_queue
+
+    
+    def run(self):
+        while True:
+            img_path = self.in_queue.get()
+            img_loads = checkImageFile(img_path)
+            if not img_loads:
+                self.bad_queue.put(img_path)
+            self.in_queue.task_done()

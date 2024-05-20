@@ -27,7 +27,7 @@ def checkImageFile(image_path):
 
     Args:
 
-        image_path (str): path to the image file that will be loaded.
+        image_path (str): Path to the image file that will be loaded.
 
     Returns:
 
@@ -49,7 +49,7 @@ def checkImages(top_dir, n_workers=0):
         top_dir (str): Path to the root of the directory tree 
             containing image files to be checked.
         
-        n_workers (int): number of worker processes to use. Defaults to
+        n_workers (int): Number of worker processes to use. Defaults to
             the number of logical CPU cores.
     
     Returns:

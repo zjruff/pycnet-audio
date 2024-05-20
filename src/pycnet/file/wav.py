@@ -15,7 +15,7 @@ Functions:
 
 Classes:
 
-    wavWorker
+    WaveWorker
         Worker process that generates spectrograms from audio files 
         using SoX.
 """

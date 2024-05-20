@@ -1,38 +1,39 @@
 """Defines functions for various file handling tasks. 
 
 Functions:
-    
+
+    buildFilename
+        Construct a filename using a prefix and a timestamp.
+
     findFiles
         List all paths with a given extension in a directory 
         tree.
-    
+
     getFileSize
         Return the size of a file in human-readable units.
-    
+
     getFolder
         Return the location of a file relative to a higher-level
         folder.
-    
-    makeFileInventory
-        Build a table of basic attributes for a list of files.
-    
-    summarizeInventory
-        Summarize a table of info on .wav files in human-readable form.
-    
+
     inventoryFolder
         Inventory .wav files in a folder and write the info to a file.
-    
-    buildFilename
-        Construct a filename using a prefix and a timestamp.
-    
-    renameFiles
-        Rename files based on values in a DataFrame.
-    
+
+    makeFileInventory
+        Build a table of basic attributes for a list of files.
+
     massRenameFiles
         Rename files with a given extension in a directory tree (or 
         undo this operation if previously performed).
-    
-    removeSpectroDir: Recursively remove temporary files and folders.
+
+    removeSpectroDir
+        Recursively remove temporary files and folders.
+
+    renameFiles
+        Rename files based on values in a DataFrame.
+
+    summarizeInventory
+        Summarize a table of info on .wav files in human-readable form.
 
 """
 
@@ -51,10 +52,11 @@ def findFiles(top_dir, file_ext):
 
     Args:
 
-        top_dir: Path to the root of the directory tree to be searched.
+        top_dir (str): Path to the root of the directory tree to be 
+            searched.
 
-        file_ext: File extension of files to look for. A leading dot 
-            (.) is not necessary but will not hurt anything.
+        file_ext (str): File extension of files to look for. A leading 
+            dot (.) is not necessary but will not hurt anything.
 
     Returns:
 
@@ -78,9 +80,9 @@ def getFileSize(file_path, units='gb'):
 
     Args:
 
-        file_path: path to the target file.
+        file_path (str): path to the target file.
 
-        units: units to use when reporting file size ('gb' for 
+        units (str): units to use when reporting file size ('gb' for 
             gibibytes, 'mb' for mebibytes, 'kb' for kibibytes, and 'b'
             for bytes).
 
@@ -134,8 +136,8 @@ def makeFileInventory(path_list, top_dir, use_abs_path=False):
     Returns:
 
         Pandas.DataFrame: DataFrame with one row for each .wav file 
-            listing its folder (absolute or relative to top_dir), 
-            filename, size in bytes, and duration in seconds.
+        listing its folder (absolute or relative to top_dir), filename,
+        size in bytes, and duration in seconds.
     """
 
     top_path = Path(top_dir)

@@ -5,52 +5,52 @@ PNW-Cnet v4 and v5 and their respective codes / labels.
 
 Functions:
 
-    readPredFile
-        Read a table of PNW-Cnet class scores from a CSV file.
-    
-    getClipInfo
-        Infer information about a file from its filename.
-    
     buildClipDataFrame
         Produce a table listing when each clip was recorded.
-    
+
+    getApparentDetections
+        Find apparent detections of one class at one score threshold 
+        within a set of class scores.
+
+    getClipInfo
+        Infer information about a file from its filename.
+
+    getDefaultReviewSettings
+        Decide which score threshold to use for each target class when 
+        no review_settings file was provided.
+        
     getSourceFile
         Return the name of the .wav file from which a clip was taken.
     
     getSourceFolders
         Get locations of a set of files within a directory tree.
     
-    readReviewSettings
-        Read a mapping of target classes to score thresholds from a CSV
-        file.
-    
-    getDefaultReviewSettings
-        Decide which score threshold to use for each target class when 
-        no review_settings file was provided.
-    
-    summarizeRecordingEffort
-        Summarize the number of clips and amount of recording time by 
-        site, station and date.
-    
-    getApparentDetections
-        Find apparent detections of one class at one score threshold 
-        within a set of class scores.
-    
-    tallyDetections
-        Tally up the number of apparent detections for all classes in a
-        set of class scores at a single threshold.
-    
-    summarizeDetections
-        Tally up apparent detections of all target classes from a set 
-        of class scores across a range of score thresholds.
+    makeKscopeReviewTable
+        Produce a table of apparent detections, formatted to be 
+        exported as a CSV file and browsed / tagged in Kaleidoscope.
     
     makeReviewTable
         Produce a table of apparent detections of one or more target 
         classes for manual review.
-    
-    makeKscopeReviewTable
-        Produce a table of apparent detections, formatted to be 
-        exported as a CSV file and browsed / tagged in Kaleidoscope.
+
+    readPredFile
+        Read a table of PNW-Cnet class scores from a CSV file.
+
+    readReviewSettings
+        Read a mapping of target classes to score thresholds from a CSV
+        file.
+
+    summarizeRecordingEffort
+        Summarize the number of clips and amount of recording time by 
+        site, station and date.
+
+    summarizeDetections
+        Tally up apparent detections of all target classes from a set 
+        of class scores across a range of score thresholds.
+
+    tallyDetections
+        Tally up the number of apparent detections for all classes in a
+        set of class scores at a single threshold.
 """
 
 from datetime import datetime, timedelta

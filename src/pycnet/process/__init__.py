@@ -3,31 +3,34 @@ audio data using PNW-Cnet.
 
 Functions:
 
-    getWavPaths
-        Reconstruct absolute paths to .wav files listed in a DataFrame 
-        containing filenames and relative paths.
-    
     buildProcQueue
         Create a JoinableQueue defining .wav files to be processed and 
         the directories where temporary spectrogram image files will be
         stored.
-    
-    makeFileInventory
-        Build an inventory of .wav files in the target folder.
-    
+
+    generateClassScores
+        Generate class scores for a set of images using the PNW-Cnet 
+        model.
+
+    generateEmbeddings
+        Generate embeddings for a set of images using PNW-Cnet.
+
     generateSpectrograms
         Generate a set of spectrograms representing segments of the 
         audio data.
-    
-    generateClassScores
-        Process an existing set of spectrograms using the PNW-Cnet 
-        model.
-    
-    processFolder
-        Perform one or more processing operations on a folder.
-        
+
+    getWavPaths
+        Reconstruct absolute paths to .wav files listed in a DataFrame 
+        containing filenames and relative paths.
+
+    makeFileInventory
+        Build an inventory of .wav files in the target folder.
+
     parsePycnetArgs
         Define command-line options for the 'pycnet' console script.
+
+    processFolder
+        Perform one or more processing operations on a folder.
 """
 
 import argparse
@@ -259,7 +262,7 @@ def generateClassScores(target_dir, model_path, show_prog=True):
     return predictions
 
 
-def getEmbeddings(target_dir, cnet_version, show_prog=True):
+def generateEmbeddings(target_dir, cnet_version, show_prog=True):
     """Generate embeddings for a set of images using PNW-Cnet.
 
     Embeddings are the activation of the penultimate fully-connected 

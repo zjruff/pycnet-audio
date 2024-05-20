@@ -45,7 +45,7 @@ Issues = "https://github.com/zjruff/pycnet-audio/issues"
 
 [project.scripts]
 pycnet = "pycnet.__main__:main"
-test_pycnet = "pycnet.process.TestPycnet:main"
+test_pycnet = "pycnet.TestPycnet:main"
 
 
 [tool.setuptools]

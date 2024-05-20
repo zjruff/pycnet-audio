@@ -1,11 +1,10 @@
-"""
-'pycnet' library for audio processing
+"""'pycnet' library for audio processing
 
 The purpose of this library is to provide a Python-based API and 
 command-line tools for the PNW-Cnet audio classification model for
 processing bioacoustics data on practical scales.
 
-:copyright: (c) 2024 by Zachary Ruff
+:copyright: (c) 2024 by Zachary J. Ruff
 :license: GNU General Public License v3; see LICENSE for details.
 """
 

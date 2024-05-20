@@ -1,7 +1,17 @@
-"""Generate one or more audio files containing mostly random noise
-and a few examples of the synthetic survey tone played during northern
-spotted owl surveys. Run these files through the pycnet processing 
-pipeline to verify everything is working properly.
+"""Test the functionality of pycnet using synthetic data.
+
+This script generates one audio file containing mostly random noise and
+a few examples of the synthetic tone played during northern spotted owl
+surveys (which is a target class in PNW-Cnet v5), then generates a set
+of spectrograms from the file, processes the spectrograms using 
+PNW-Cnet v5, and checks that there are apparent detections of the 
+Survey_Tone class at the correct timestamps.
+
+Once the pycnet-audio package has been installed, just run
+
+test_pycnet
+
+and the script should run.
 
 """
 
@@ -13,10 +23,25 @@ import subprocess
 
 
 def generateToneFile(output_dir):
-    """Generate a 10 minute clip containing silence except for survey
+    """Create a synthetic audio file containing three NSO survey tones.
+    
+    Generate a 10 minute clip containing "pink noise" with NSO survey
     tones at 00:40, 03:25, and 07:50, normalized to -30 dB.
-    Complete survey tones will be in part_004, part_018, and part_040.
+
+    When the resulting audio file is processed using PNW-Cnet v5, there
+    should be high-confidence detections of the Survey_Tone class in
+    the part_004, part_018, and part_040 clips.
+    
+    Args:
+    
+        output_dir (str): Path to the directory in which the temporary 
+            folder, audio file, and spectrograms will be generated.
+            
+    Returns:
+        
+        str: Path to the audio file that was synthesized.
     """
+
     sox_path = "sox"
     sox_cmd_init = "{0} -n -r 32000 -c 1 -b 16 -e signed-integer".format(sox_path)
 

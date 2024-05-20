@@ -8,7 +8,7 @@
 
 name: publish Python distribution to TestPyPI
 
-on: push
+on: release
 
 permissions:
   contents: read

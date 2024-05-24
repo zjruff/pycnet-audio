@@ -6,13 +6,14 @@
 
 Welcome to pycnet-audio!
 ========================
-.. note::
+.. admonition:: Version information
 
 	This document is for pycnet-audio version |release| and was generated |today|.
 
 .. contents:: Contents
 
-**pycnet-audio** is a package that provides command-line tools and a Python API for processing bioacoustics data using the PNW-Cnet deep learning model. pycnet-audio is structured as a Python package and contains a main module called ``pycnet`` with several submodules that can be imported and used in Python code to define your own workflows for processing audio data. It also provides command-line tools in the form of console scripts which can be used as-is to execute more standardized workflows. To see the formal package documentation, check the links under :ref:`Module Reference <module-reference>`. For installation instructions, detailed usage notes and tutorials, keep reading.
+
+**pycnet-audio** is a package that provides command-line tools and a Python API for processing bioacoustics data using the PNW-Cnet deep learning model. pycnet-audio is structured as a Python package and contains a main module called ``pycnet`` with several submodules that can be imported and used in Python code to define your own workflows for processing audio data. It also provides command-line tools in the form of console scripts which can be used as-is to execute more standardized workflows. To see the formal package documentation, check the links under Module Reference. For installation instructions, detailed usage notes and tutorials, keep reading.
 
 This guide generally assumes that you are running a 64-bit version of Windows. pycnet-audio is theoretically platform-agnostic, but we have not tested it extensively on GNU/Linux or MacOS systems. Language geared toward users on these platforms may be added in the future.
 
@@ -24,9 +25,7 @@ This guide generally assumes that you are running a 64-bit version of Windows. p
 
 .. admonition:: A note on naming
 
-	The name **pycnet** is a portmanteau of **Py**\thon and PNW-**Cnet**\, chosen for being short, punchy, and easy to type. The main importable module provided by this package is called pycnet, as is the main command-line tool used to process data, so we initially planned to use pycnet as the name of the distribution package as well. Tragically, this name was already taken on PyPI.org, so to avoid ambiguity, the distribution package is called pycnet-audio.
-	
-	In practical terms, this means you'll want to use the name **pycnet-audio** when installing or updating the package using pip. For all other purposes, including running the command-line tools as well as using the functions and classes exported by the module in your own code, you'll use the name **pycnet**.
+	The name **pycnet** is a portmanteau of **Py**\thon and PNW-**Cnet**\, chosen for being short, punchy, and easy to type. The main importable module provided by this package is called pycnet, as is the main command-line tool used to process data, so we initially planned to use pycnet as the name of the distribution package as well. Tragically, this name was already taken on PyPI.org, so to avoid ambiguity, the distribution package is called pycnet-audio. Practically, this means you should use the name **pycnet-audio** when installing or updating the package using pip. For all other purposes, including running the command-line tools as well as using the functions and classes exported by the module in your own code, use **pycnet**.
 
 
 Installation
@@ -90,7 +89,7 @@ This will run the TestPycnet script, which will create a temporary folder in the
 
 Hit Enter to delete the temporary test folder, then give yourself a pat on the back. You have successfully installed pycnet-audio!
 
-.. admonition:: Updating packages
+.. note::
 
 	If you ever want to update pycnet-audio (or any other package), you can do so by running e.g.
 	::
@@ -107,10 +106,6 @@ Using pycnet
 	:: 
 
 		conda activate pycnet
-
-.. note::
-
-	If you want to practice using pycnet and don't have audio data of your own to work with, there is a small (10.5 hour) test audio dataset available for download at https://zenodo.org/records/7849426.
 
 We have a defined processing workflow for bioacoustics data which consists of a number of distinct steps that are completed in sequence, beginning with a set of audio files that have been retrieved from the field and ending with a set of target species detections that can be analyzed to make ecological inferences. The steps in our workflow are as follows:
 
@@ -261,8 +256,39 @@ The available optional arguments are as follows:
 Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the processing mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.
 
 
-Output files
-------------
+More examples
+-------------
+
+.. note::
+
+	If you want to practice using pycnet and don't have audio data of your own to work with, there is a small (10.5 hour) test audio dataset available for download at https://zenodo.org/records/7849426.
+
+It may be helpful to see some additional examples of processing data using pycnet. Let's say I have some audio data located in a folder on an external hard drive, which has drive letter D. The path to the folder is ``D:\CLE_36702``. I want to generate the spectrograms in a folder on my solid-state drive, which has drive letter G. I want to do some other work while the process is running, so I don't want to use all available CPU cores. I could run
+::
+
+	pycnet process D:\CLE_36702 -w 8 -i G:\spectrograms -r F:\review_settings.csv -a
+
+- ``pycnet process D:\CLE_36702`` means I want to run through the full processing pipeline with the audio data in this folder.
+- ``-w 8`` means I want to use 8 worker processes when generating spectrograms. My machine has 16 logical cores, so this works fine.
+- ``-i G:\spectrograms`` means the spectrogram image files will be generated in a folder located at ``G:\spectrograms\CLE_36702``. The ``G:\spectrograms`` folder will be created if it doesn't already exist.
+- ``-r F:\review_settings.csv`` means that when generating the review file, pycnet will only include target classes listed in ``F:\review_settings.csv`` and will use the score thresholds listed in the file to define apparent detections of each of these classes.
+- ``-a`` means the folder at ``G:\spectrograms\CLE_36702`` will be deleted once the class scores, detection summary file, and review file have been generated. (The ``G:\spectrograms`` folder will not be deleted.)
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Module Reference
+
+   pycnet <modules>
+   pycnet.cnet <pycnet.cnet>
+   pycnet.file <pycnet.file>
+   pycnet.process <pycnet.process>
+   pycnet.prog <pycnet.prog>
+   pycnet.review <pycnet.review>
+
+
+Appendix A. Output files
+========================
 
 Depending on the mode chosen, pycnet may generate one or more output files when you process data. These will all be in the form of comma-separated value (CSV) files, and they will all be saved in the target directory you provided. CSV files can be opened in a spreadsheet program like Excel or a text editor like Notepad, or imported as a table using a statistical program like R. The names of these files will include the name of the target directory (just the folder name, not the full path) and, in most cases, the version of PNW-Cnet used (either 'v5' or 'v4'). As an example, let's say I have data in a folder called CLE_36702 that I have processed with PNW-Cnet version 5. The output files would be as follows:
 
@@ -282,7 +308,7 @@ CLE_36702_v5_class_scores.csv
 	Lists the class scores generated by PNW-Cnet v5 for the set of spectrograms generated from the .wav files listed in CLE_36702_wav_inventory.csv. Fields in this file are as follows: 
 	
 		Filename
-			Names of each spectrogram image file. 
+			Name of each spectrogram image file. 
 		[ACCO1, ACGE1, ..., ZOLE1] 
 			Class scores for each of the 135 PNW-Cnet v5 target classes for each image. Each class score is a decimal value in the range [0,1]. Higher class scores indicate a stronger match. If the class scores were generated using PNW-Cnet v4 then there will instead be 51 class score columns [AEAC, BRCA, ..., ZEMA], but the structure will be the same.
 	
@@ -290,21 +316,21 @@ CLE_36702_v5_detection_summary.csv
 	Lists the number of apparent detections for all PNW-Cnet v5 target classes across a range of thresholds [0.05, 0.10, ..., 0.95, 0.98, 0.99], summed for each combination of site, recording station, and recording date. Fields in this file are as follows:
 	
 		Area
-			Study area ID. First component of the filename; in this case CLE.
+			Study area ID. First component of the .wav filenames; in this case CLE.
 		Site
-			Field site ID. Second component of the filename; in this case 36702.
+			Field site ID. Second component of the .wav filenames; in this case 36702.
 		Stn
-			Recording station ID. Third component of the filename.
+			Recording station ID. Third component of the .wav filenames.
 		Date
-			Calendar date when recording occurred.
+			Calendar date.
 		Rec_Day
-			Sequential day of recording at this Site, equal to Date - min(Date) + 1.
+			Sequential day of recording at this site, equal to ``Date - min(Date) + 1``.
 		Rec_Week
-			Sequential week of recording at this Site, equal to int(Rec_Day / 7) + 1.
+			Sequential week of recording at this site, equal to ``int(Rec_Day / 7) + 1``.
 		Clips
 			Number of 12-second clips in the class_scores file for this combination of Area, Site, Stn, and Date.
 		Effort
-			Hours of recording for this combination of Area, Site, Stn, and Date, equal to Clips / 300.
+			Hours of recording for this combination of Area, Site, Stn, and Date, equal to ``Clips / 300.``.
 		Threshold
 			Score threshold used to tally apparent detections.
 		[ACCO1, ACGE1, ..., ZOLE1]
@@ -362,33 +388,12 @@ CLE_36702_v5_review_kscope.csv
 			Column to hold species IDs and other tags added manually in Kaleidoscope. Always blank when the file is created. If you plan to tag the review file manually, we recommend saving it under a different filename (e.g. ``CLE_36702_review_kscope_TAGGED.csv``) to avoid the possibility of accidentally overwriting the tags you have applied.
 
 
-More examples
--------------
+Appendix B. PNW-Cnet target classes
+===================================
 
-It may be helpful to see some additional examples of processing data using pycnet. Let's say I have some audio data located in a folder on an external hard drive, which has drive letter D. The path to the folder is ``D:\CLE_36702``. I want to generate the spectrograms in a folder on my solid-state drive, which has drive letter G. I want to do some other work while the process is running, so I don't want to use all available CPU cores. I could run
-::
+The following table lists the target classes (sonotypes) detected by versions v4 and v5 of the PNW-Cnet model. The 'v4_Code' and 'v5_Code' columns list the abbreviated class codes which are used as column headers for columns containing class scores in the PNW-Cnet prediction files. All classes that were included in PNW-Cnet v4 were subsequently also included in PNW-Cnet v5, but the class codes were updated between versions to reflect more consistent naming conventions.
 
-	pycnet process D:\CLE_36702 -w 8 -i G:\spectrograms -r F:\review_settings.csv -a
+.. csv-table:: Target Classes
+	:file: ../src/pycnet/cnet/target_classes.csv
+	:header-rows: 1
 
-- ``pycnet process D:\CLE_36702`` means I want to run through the full processing pipeline with the audio data in this folder.
-- ``-w 8`` means I want to use 8 worker processes when generating spectrograms. My machine has 16 logical cores, so this works fine.
-- ``-i G:\spectrograms`` means the spectrogram image files will be generated in a folder located at ``G:\spectrograms\CLE_36702``. The ``G:\spectrograms`` folder will be created if it doesn't already exist.
-- ``-r F:\review_settings.csv`` means that when generating the review file, pycnet will only include target classes listed in ``F:\review_settings.csv`` and will use the score thresholds listed in the file to define apparent detections of each of these classes.
-- ``-a`` means the folder at ``G:\spectrograms\CLE_36702`` will be deleted once the class scores, detection summary file, and review file have been generated. (The ``G:\spectrograms`` folder will not be deleted.)
-
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Modules
-   
-   modules
-   
-
-.. _module-reference:
-
-Module Reference
-================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

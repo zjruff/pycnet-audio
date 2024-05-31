@@ -31,7 +31,7 @@ This guide generally assumes that you are running a 64-bit version of Windows. p
 Installation
 ============
 
-pycnet-audio can be installed from the `Python Package Index <https://pypi.org/>`_ using the ``pip`` tool, which comes bundled with all modern Python distributions. You will need Python version 3.8, and to use the program in full, you will also need to install `SoX <https://sourceforge.net/projects/sox/>`_. To simplify setup and dependency management, we recommend using a dedicated Conda environment. A conda environment is essentially a self-contained Python installation that can be created, configured, and deleted without affecting the operation of other software on your system. Conda environments can also be readily "cloned," which makes it easy to set up identical environments on multiple machines. 
+pycnet-audio can be installed from the `Python Package Index <https://pypi.org/>`_ using the ``pip`` tool, which comes bundled with all modern Python distributions. You will need Python version 3.8, and to use the program in full, you will also need to install `SoX <https://sourceforge.net/projects/sox/>`_. To simplify setup and dependency management, we recommend using a dedicated Conda environment. Conda environments are essentially self-contained Python installations that can be created, configured, and deleted without affecting the operation of other software on your system. They can also be readily "cloned," which makes it straightforward to set up identical environments on multiple machines. 
 
 To set up a Conda environment, you will need to install either Anaconda or Miniconda. We recommend using Miniconda, which is designed to be lightweight and modular, whereas Anaconda is a fairly heavy-duty suite containing a variety of scientific software, most of which is not relevant for our purposes. 
 
@@ -100,12 +100,6 @@ Hit Enter to delete the temporary test folder, then give yourself a pat on the b
 
 Using pycnet
 ============
-.. admonition:: Pay attention to your environment
-
-	If you installed pycnet-audio in a Conda environment, you'll need to run the tool with the appropriate environment active, denoted by the ``(pycnet)`` active environment indicator at the start of the prompt. If it isn't there, activate the environment by running 
-	:: 
-
-		conda activate pycnet
 
 We have a defined processing workflow for bioacoustics data which consists of a number of distinct steps that are completed in sequence, beginning with a set of audio files that have been retrieved from the field and ending with a set of target species detections that can be analyzed to make ecological inferences. The steps in our workflow are as follows:
 
@@ -121,6 +115,12 @@ pycnet is not designed to encompass every aspect of this workflow, since it is m
 
 Basic usage
 -----------
+.. admonition:: Pay attention to your environment
+
+	If you installed pycnet-audio in a Conda environment, you'll need to run the tool with the appropriate environment active, denoted by the ``(pycnet)`` active environment indicator at the start of the prompt. If it isn't there, activate the environment by running 
+	:: 
+
+		conda activate pycnet
 
 The command-line tools provided by pycnet-audio can be run from a shell program like the Anaconda Prompt, Windows PowerShell, bash, etc. You run the tool by invoking the ``pycnet`` command followed by a set of `arguments`. The basic usage will look something like this:
 ::
@@ -212,17 +212,17 @@ pycnet will search the target directory for audio files with a .wav extension. T
 	**If your filenames do not adhere to this format, we cannot guarantee that all functions will work correctly.**
 
 
-In addition to the above advice on filename formatting, we **strongly recommend** that you avoid using spaces in the names of your files and folders, as this can introduce various unintended behavior when processing data; underscores are a safe alternative. If you need to process data in a location whose path includes spaces, you will need to enclose the target directory argument in double quotes when calling pycnet, e.g.
+In addition to the above advice on filename formatting, we strongly recommend that you avoid using spaces in the names of your files and folders, as this can introduce various unintended behavior when processing data; underscores are a safe alternative. If you want to process data in a location whose path includes spaces, then you will need to enclose the target directory argument in double quotes when calling pycnet, e.g.
 ::
 
 	pycnet process "F:\2024 ARU Data\KLA_16408"
 
-This tells the interpreter to treat the text within the quotes as a single value rather than splitting the text at the spaces and treating each component as a separate argument. The Windows "Copy as path" option described above will automatically add quotes around the path. (For paths that *don't* contain spaces, there is no need to add quotes, but it won't hurt anything if you do.)
+This tells the interpreter to treat the text within the quotes as a single value rather than splitting the text at the spaces and treating each component as a separate value. The Windows "Copy as path" option described above will automatically add quotes around the path. (Paths that don't contain spaces do not need to be enclosed in quotes, but it won't hurt anything if you do.)
 
 Optional arguments
 ------------------
 
-In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, a few flags (**-a** and **-q**\) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
+In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, a few flags (**-a**, **-l**, and **-q**\) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
 
 The available optional arguments are as follows:
 
@@ -238,6 +238,9 @@ The available optional arguments are as follows:
  -i (Image directory) 
 	Allows you to specify a location where the temporary spectrogram directory should be created. If not provided, the spectrograms will be generated in a folder called Temp within the target directory. This can improve processing speed, e.g. generating spectrograms in a folder on a solid-state drive will allow you to take advantage of the SSD's higher read and write speeds.
  
+ -l (Log output to file)
+	Tell pycnet to copy output messages to a file in the target directory, in addition to displaying them in the console.
+ 
  -o (Output file)
 	Specify a name to be used for the review file instead of the default name. Useful if you want to experiment with different review settings without overwriting a previously generated file.
  
@@ -247,8 +250,8 @@ The available optional arguments are as follows:
  -q (Quiet mode)
 	Suppress progress bars when generating spectrograms and class scores. This flag does not need to be paired with a value.
  
- -r (Review file)	
-	Path to a CSV file specifying criteria to use when generating the review file. The file provided must have a column called "Class" listing the codes of the classes that you want included and another column called "Threshold" listing the score threshold (a decimal value between 0 and 1) to use to define apparent detections for each class.
+ -r (Review settings)	
+	You can specify review criteria in two different ways. First, you can supply the path to a CSV file specifying criteria to use when generating the review file. The file provided must have a column called "Class" listing the codes of the classes that you want included and another column called "Threshold" listing the score threshold (a decimal value between 0 and 1) to use to define apparent detections for each class. Alternatively, you can supply a text string consisting of class codes (or groups of class codes) followed by the score threshold to use for each class or group of classes, e.g. ``"STOC_4Note 0.50 STOC_Series Strix_Whistle 0.75"`` (the string must be enclosed in quotes, since it includes spaces).
  
  -w (Worker processes)
 	Number of worker processes to use when generating spectrograms. By default, pycnet will use the number of logical CPU cores on your machine, as this is typically the fastest option. Specify a lower number if you want to reserve some CPU power for other tasks. Note that processing speed can be affected by other factors, e.g. the read and write speeds of the drives involved, so using more worker processes is not always faster.
@@ -271,8 +274,21 @@ It may be helpful to see some additional examples of processing data using pycne
 - ``pycnet process D:\CLE_36702`` means I want to run through the full processing pipeline with the audio data in this folder.
 - ``-w 8`` means I want to use 8 worker processes when generating spectrograms. My machine has 16 logical cores, so this works fine.
 - ``-i G:\spectrograms`` means the spectrogram image files will be generated in a folder located at ``G:\spectrograms\CLE_36702``. The ``G:\spectrograms`` folder will be created if it doesn't already exist.
-- ``-r F:\review_settings.csv`` means that when generating the review file, pycnet will only include target classes listed in ``F:\review_settings.csv`` and will use the score thresholds listed in the file to define apparent detections of each of these classes.
 - ``-a`` means the folder at ``G:\spectrograms\CLE_36702`` will be deleted once the class scores, detection summary file, and review file have been generated. (The ``G:\spectrograms`` folder will not be deleted.)
+- ``-r F:\review_settings.csv`` means that when generating the review file, pycnet will only include target classes listed in ``F:\review_settings.csv`` and will use the score thresholds listed in the file to define apparent detections of each of these classes. The file provided should be formatted like so:
+
+	+-------------+-----------+
+	| Class       | Threshold |
+	+=============+===========+
+	| STOC_4Note  | 0.50      |
+	+-------------+-----------+
+	| STVA_8Note  | 0.95      |
+	+-------------+-----------+
+	| BRMA1       | 0.95      |
+	+-------------+-----------+
+
+There must be a column called ``Class`` listing the target classes to be included and another column called ``Threshold`` giving the score threshold to use for each class. If the file has any additional columns (e.g. for notes, common names, etc), they will be ignored. Note that pycnet will search for apparent detections for each of these classes in the order they are listed in the ``Class`` column, and a given clip can only appear once in the review file. For instance, if a clip has a score of 0.81 for the ``STOC_4Note`` class and a score of 0.98 for the ``STVA_8Note`` class, it will be included in the review file with ``STOC_4Note`` in the ``TOP1MATCH`` column, even though it scored higher for ``STVA_8Note``. (However, the ``AUTO_TAG`` column will read ``STOC_4Note+STVA_8Note`` to indicate that it met the threshold for both classes.)
+
 
 
 .. toctree::

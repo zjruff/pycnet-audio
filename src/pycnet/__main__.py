@@ -31,22 +31,23 @@ def main():
     else:
         show_prog = not args.quiet_mode
         auto_cleanup = args.auto_cleanup
+        log_to_file = args.log_to_file
         
         if args.mode == "process":
-            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers, args.review_settings]
-            pycnet.process.processFolder(*proc_args, show_prog=show_prog, cleanup=auto_cleanup)
+            proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers]
+            pycnet.process.processFolder(*proc_args, review_settings=args.review_settings, output_file=args.output_file, log_to_file=log_to_file, show_prog=show_prog, cleanup=auto_cleanup)
 
         elif args.mode == "spectro":
             spectro_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers]
-            pycnet.process.processFolder(*spectro_args, show_prog=show_prog, cleanup=auto_cleanup)
+            pycnet.process.processFolder(*spectro_args, log_to_file=log_to_file, show_prog=show_prog, cleanup=auto_cleanup)
 
         elif args.mode == "predict":
             predict_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir]
-            pycnet.process.processFolder(*predict_args, show_prog=show_prog, cleanup=auto_cleanup)
+            pycnet.process.processFolder(*predict_args, review_settings=args.review_settings, show_prog=show_prog, output_file=args.output_file, log_to_file=log_to_file, cleanup=auto_cleanup)
 
         elif args.mode == "review":
             review_args = [args.mode, args.target_dir, args.cnet_version]
-            pycnet.process.processFolder(*review_args, cleanup=auto_cleanup)
+            pycnet.process.processFolder(*review_args, review_settings=args.review_settings, output_file=args.output_file, log_to_file=log_to_file, cleanup=auto_cleanup)
 
         elif args.mode == "inventory":
             inv_args = [args.target_dir]

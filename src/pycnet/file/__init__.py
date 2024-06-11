@@ -173,15 +173,15 @@ def summarizeInventory(wav_inventory):
 
     Returns:
 
-        Nothing.
+        str: A human-readable summary of the audio dataset.
     """
 
     n_wav_files = len(wav_inventory)
     wav_lengths = wav_inventory["Duration"]
     wav_sizes = wav_inventory["Size"]
     total_dur, total_gb = sum(wav_lengths) / 3600., sum(wav_sizes) / 1024.**3
-    print("\nFound {0} wav files.\nTotal duration: {1:.1f} h\nTotal size: {2:.1f} GB\n".format(n_wav_files, total_dur, total_gb))
-    return
+    summary = "Directory contains {0} .wav files.\nTotal duration: {1:.1f} h\nTotal size: {2:.1f} GB".format(n_wav_files, total_dur, total_gb)
+    return summary
 
 
 def inventoryFolder(target_dir, write_file=True, print_summary=True):

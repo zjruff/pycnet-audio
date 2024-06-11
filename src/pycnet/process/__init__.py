@@ -23,6 +23,9 @@ Functions:
         Reconstruct absolute paths to .wav files listed in a DataFrame 
         containing filenames and relative paths.
 
+    logMessage
+        Print a message and optionally write it to a log file.
+
     makeFileInventory
         Build an inventory of .wav files in the target folder.
 
@@ -320,7 +323,29 @@ def generateEmbeddings(target_dir, cnet_version, show_prog=True):
     return {"predictions": predictions, "embeddings": embeddings}
 
 
-def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, show_prog=True, cleanup=False):
+def logMessage(message, log_file_path=None):
+    """Print a message and optionally write it to a log file.
+    
+    Args:
+        
+        message (str): Message to be printed and written to file.
+        
+        log_file_path (str): Path to the log file, or None.
+        
+    Returns:
+    
+        Nothing.
+    """
+    if log_file_path is not None:
+        with open(log_file_path, 'a') as log_file:
+            log_file.write(message)
+            
+    print(message)
+    
+    return
+
+
+def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, output_file=None, log_to_file=False, show_prog=True, cleanup=False):
     """Perform one or more processing operations on data in a folder.
 
     Basically runs through the functions above in a logical sequence to
@@ -334,30 +359,37 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
 
     Args:
 
-        mode (str): processing mode, i.e., which operation(s) to 
+        mode (str): Processing mode, i.e., which operation(s) to 
             perform.
 
-        target_dir (str): path to the folder containing audio data to
+        target_dir (str): Path to the folder containing audio data to
             be processed.
 
-        cnet_version (str): which version of the PNW-Cnet model to use
+        cnet_version (str): Which version of the PNW-Cnet model to use
             when generating class scores ("v4" or "v5").
 
-        spectro_dir (str): path to the folder where spectrograms should
+        spectro_dir (str): Path to the folder where spectrograms should
             be stored.
 
-        n_workers (int): how many worker processes to use when 
+        n_workers (int): How many worker processes to use when 
             generating spectrograms.
 
-        review_settings (str): path to a CSV file with one column 
+        review_settings (str): Path to a CSV file with one column 
             "Class" listing classes to include in the review file and
             one column "Threshold" listing the score threshold to use 
-            for each class.
+            for each class -OR- a string containing class codes or
+            groups of class codes followed by the score threshold to be
+            used for each class or group.
+        
+        output_file (str): Name of the review file to be generated.
+        
+        log_to_file (bool): Whether to copy console messages to a log 
+            file (does not include progress bars).
 
-        show_prog (bool): whether to show progress bars when generating
+        show_prog (bool): Whether to show progress bars when generating
             spectrograms and classifying images with PNW-Cnet.
 
-        cleanup (bool): whether to delete spectrograms and temporary 
+        cleanup (bool): Whether to delete spectrograms and temporary 
             folders when processing is complete.
 
     Returns:
@@ -365,30 +397,42 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         Nothing.
     """
 
+    ### Preliminary housekeeping ###
     time_fmt = "%b %d at %H:%M:%S"
-    
+
     folder_name = os.path.basename(target_dir)
     output_prefix = "{0}_{1}".format(folder_name, cnet_version)
-    
+
     wav_inv_file = os.path.join(target_dir, "{0}_wav_inventory.csv".format(folder_name))
     class_score_file = os.path.join(target_dir, "{0}_class_scores.csv".format(output_prefix))
     det_sum_file = os.path.join(target_dir, "{0}_detection_summary.csv".format(output_prefix))
-    review_file = os.path.join(target_dir, "{0}_review.csv".format(output_prefix))
-    kscope_file = review_file.replace("review", "review_kscope")
-    
-    output_files = []
-    
-    ### Inventory .wav files and set up processing directories ###
-    if not os.path.exists(wav_inv_file):
-        print("Creating inventory file {0}.".format(wav_inv_file))
-        wav_inventory = pycnet.file.inventoryFolder(target_dir)
-        output_files.append(wav_inv_file)
+
+    if output_file is not None:
+        review_file = os.path.join(target_dir, output_file)
     else:
-        print("Using inventory file {0}.".format(wav_inv_file))
-        wav_inventory = pd.read_csv(wav_inv_file)
-        pycnet.file.summarizeInventory(wav_inventory)
+        review_file = os.path.join(target_dir, "{0}_review.csv".format(output_prefix))
+    kscope_file = review_file.replace("review", "review_kscope")
+
+    output_files = []
 
     proc_start = dt.datetime.now()
+
+    if log_to_file:
+        proc_log_file = os.path.join(target_dir, "{0}_processing_log_{1}.txt".format(folder_name, proc_start.strftime("%d_%b_%H%M")))
+        output_files.append(proc_log_file)
+    else:
+        proc_log_file = None
+
+    ### Inventory .wav files and set up processing directories ###
+    if not os.path.exists(wav_inv_file):
+        logMessage("Creating .wav inventory file...", proc_log_file)
+        wav_inventory = pycnet.file.inventoryFolder(target_dir, print_summary=False)
+        output_files.append(wav_inv_file)
+    else:
+        logMessage("Using preexisting .wav inventory file...", proc_log_file)
+        wav_inventory = pd.read_csv(wav_inv_file)
+    
+    logMessage('\n' + pycnet.file.summarizeInventory(wav_inventory) + '\n', proc_log_file)
 
     if spectro_dir is None:
         image_dir = os.path.join(target_dir, "Temp", "images")
@@ -402,13 +446,13 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         try:
             os.makedirs(image_dir)
         except:
-            print("\nCould not create temporary directory in the location requested!")
-            print("Aborting operation.\n")
+            logMessage("\nCould not create temporary directory in the location requested!", proc_log_file)
+            logMessage("Aborting operation.\n", proc_log_file)
             exit()
         
         proc_queue = buildProcQueue(target_dir, image_dir)
-        print("Spectrograms will be generated in the following folders:")
-        print('\n'.join(sorted(proc_queue["dirs"])))
+        logMessage("\nSpectrograms will be generated in the following folders:\n", proc_log_file)
+        logMessage('\n'.join(sorted(proc_queue["dirs"])), proc_log_file)
         
         n_cores = mp.cpu_count()
         if n_workers is None:
@@ -417,24 +461,24 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
             int_workers = int(n_workers)
             if not 1 <= int_workers <= n_cores:
                 n_workers_corr = n_cores
-                print("Cannot use {0} worker processes. Using {1} processes.".format(n_workers, n_workers_corr))
+                logMessage("Cannot use {0} worker processes. Using {1} processes.".format(n_workers, n_workers_corr), proc_log_file)
             else:
                 n_workers_corr = int_workers
         
-        print("\nGenerating spectrograms starting {0}...\n".format(proc_start.strftime(time_fmt)))
+        logMessage("\nGenerating spectrograms starting {0}...\n".format(proc_start.strftime(time_fmt)), proc_log_file)
         generateSpectrograms(proc_queue, n_workers_corr, show_prog)
         
         spectro_end = dt.datetime.now()
-        print("Finished {0}.".format(spectro_end.strftime(time_fmt)))
+        logMessage("\nFinished {0}.".format(spectro_end.strftime(time_fmt)), proc_log_file)
     
     ### Generate class scores for each image ###
     if mode in ["process", "predict"]:
         
         predict_start = dt.datetime.now()
         if mode == "predict":
-            print("\nGenerating class scores using PNW-Cnet {0} starting {1}...\n".format(cnet_version, predict_start.strftime(time_fmt)))
+            logMessage("\nGenerating class scores using PNW-Cnet {0} starting {1}...\n".format(cnet_version, predict_start.strftime(time_fmt)), proc_log_file)
         else:
-            print("\nGenerating class scores using PNW-Cnet {0}...\n".format(cnet_version))
+            logMessage("\nGenerating class scores using PNW-Cnet {0}...\n".format(cnet_version), proc_log_file)
         
         model_path = v4_model_path if cnet_version == "v4" else v5_model_path
         
@@ -443,7 +487,7 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         class_scores.to_csv(class_score_file, index = False)
         
         predict_end = dt.datetime.now()
-        print("\nFinished {0}.".format(predict_end.strftime(time_fmt)))
+        logMessage("\nFinished {0}.".format(predict_end.strftime(time_fmt)), proc_log_file)
         output_files.append(class_score_file)
 
     ### Summarize apparent detections and create review file ###
@@ -453,17 +497,24 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         except:
             class_scores = pycnet.review.readPredFile(class_score_file)
 
-        print("Summarizing apparent detections...", end='')
-        detection_summary = pycnet.review.summarizeDetections(class_scores)
-        print(" done.\n")
+        if not os.path.exists(det_sum_file):
+            logMessage("\nSummarizing apparent detections...", proc_log_file)
+            detection_summary = pycnet.review.summarizeDetections(class_scores)
+            logMessage(" done.\n", proc_log_file)
 
-        detection_summary.to_csv(det_sum_file, index=False)
-        output_files.append(det_sum_file)
+            detection_summary.to_csv(det_sum_file, index=False)
+            output_files.append(det_sum_file)
 
-        print("Generating review file...", end='')
+        logMessage("\nGenerating review file...", proc_log_file)
 
-        review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version)
-        print(" done. {0} apparent detections found.\n".format(review_df.shape[0]))
+        if review_settings is not None:
+            if os.path.exists(review_settings):
+                review_settings = pycnet.review.readReviewSettings(review_settings)
+            else:
+                review_settings =  pycnet.review.parseStrReviewCriteria(review_settings)
+
+        review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version, review_settings)
+        logMessage(" done. {0} apparent detections found.\n".format(review_df.shape[0]), proc_log_file)
 
         review_df.to_csv(kscope_file, index=False)
         output_files.append(kscope_file)
@@ -476,14 +527,14 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
 
     ### Report output files and processing speed ###    
     if len(output_files) > 0:
-        print("Created the following output files in {0}: ".format(target_dir))
-        print('\n'.join([os.path.basename(f) for f in output_files]) + '\n')
+        logMessage("\nCreated the following output files in {0}: ".format(target_dir), proc_log_file)
+        logMessage('\n'.join([os.path.basename(f) for f in output_files]) + '\n', proc_log_file)
 
     if mode == "process":
         d_hours = sum(wav_inventory["Duration"]) / 3600.
         p_hours = (proc_end - proc_start).seconds / 3600.
         dp_ratio = d_hours / p_hours
-        print("Processed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})\n".format(d_hours, p_hours, dp_ratio))
+        logMessage("\nProcessed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})\n".format(d_hours, p_hours, dp_ratio), proc_log_file)
 
     return
 
@@ -521,10 +572,13 @@ def parsePycnetArgs():
         help="Number of worker processes to use when generating spectrograms. Default: number of available cores (currently {0}).".format(n_cores))
 
     parser.add_argument("-r", dest="review_settings", type=str,
-        help="Path to file containing settings to use when generating the review file.")
+        help="Path to file containing settings to use when generating the review file, or a string specifying review criteria directly.")
 
     parser.add_argument("-o", dest="output_file", type=str,
-        help="Manually specify output filename.")
+        help="Manually specify filename for review file.")
+        
+    parser.add_argument("-l", dest="log_to_file", action="store_true",
+        help="Copy output messages to log file.")
 
     parser.add_argument("-q", dest="quiet_mode", action="store_true",
         help="Quiet mode (suppress progress bars and informational messages).")

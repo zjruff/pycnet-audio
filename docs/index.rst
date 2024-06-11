@@ -156,25 +156,25 @@ When you run the ``pycnet`` command, you almost always need to supply a mode and
 
 Here is the full list of acceptable modes and what each of them does:
 
-	process 
+	``process`` 
 		Inventory the audio files; generate spectrograms; generate class scores; summarize apparent detections; and generate the review file. This is intended to be the "bread-and-butter" option for normal data processing.
 
-	spectro 
+	``spectro`` 
 		Inventory the audio files (if necessary) and generate the spectrograms.
 
-	predict 
+	``predict`` 
 		Generate class scores from an existing set of spectrograms; summarize apparent detections; and generate the review file. Useful if you want to process the same data with multiple versions of the PNW-Cnet model.
 
-	review 
+	``review`` 
 		Summarize apparent detections from an existing set of class scores and generate a review file. Useful if you want to experiment with different review settings.
 
-	inventory 
+	``inventory`` 
 		Inventory the audio files and write the information to a CSV file.
 
-	rename 
+	``rename`` 
 		Standardize filenames to the format expected by the program, consisting of a prefix (either supplied by the user or based on the directory structure) and the date and time when the recording began.
 
-	cleanup 
+	``cleanup`` 
 		Recursively delete the spectrograms and the temporary folder in which they were generated. (This can also be done automatically in some other modes by including the **-a** flag; see below.)
 
 Target directory
@@ -222,38 +222,38 @@ This tells the interpreter to treat the text within the quotes as a single value
 Optional arguments
 ------------------
 
-In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, a few flags (**-a**, **-l**, and **-q**\) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
+In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, a few flags (``-a``, ``-l``, and ``-q``) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
 
 The available optional arguments are as follows:
 
- -h (Help)
+ ``-h`` (Help)
 	Prints a summary of the available options and exits. This option is a special case, as it can be used without specifying a mode or target directory.
 	
- -a (Auto-cleanup)
+ ``-a`` (Auto-cleanup)
 	Recursively delete the temporary folder that was created to hold the spectrogram image files once processing is complete. This flag does not need to be paired with a value.
  
- -c (Cnet version)
+ ``-c`` (Cnet version)
 	The version of the PNW-Cnet model to use when generating class scores. Options: "v4" or "v5". Default: v5.
  
- -i (Image directory) 
+ ``-i`` (Image directory) 
 	Allows you to specify a location where the temporary spectrogram directory should be created. If not provided, the spectrograms will be generated in a folder called Temp within the target directory. This can improve processing speed, e.g. generating spectrograms in a folder on a solid-state drive will allow you to take advantage of the SSD's higher read and write speeds.
  
- -l (Log output to file)
-	Tell pycnet to copy output messages to a file in the target directory, in addition to displaying them in the console.
+ ``-l`` (Log output to file)
+	Tell pycnet to copy output messages to a file in the target directory, in addition to displaying them in the console. This flag does not need to be paired with a value. 
  
- -o (Output file)
+ ``-o`` (Output file)
 	Specify a name to be used for the review file instead of the default name. Useful if you want to experiment with different review settings without overwriting a previously generated file.
  
- -p (Prefix)
+ ``-p`` (Prefix)
 	Use a specific prefix when renaming files rather than generating the prefix automatically based on folder structure.
  
- -q (Quiet mode)
+ ``-q`` (Quiet mode)
 	Suppress progress bars when generating spectrograms and class scores. This flag does not need to be paired with a value.
  
- -r (Review settings)	
+ ``-r`` (Review settings)	
 	You can specify review criteria in two different ways. First, you can supply the path to a CSV file specifying criteria to use when generating the review file. The file provided must have a column called "Class" listing the codes of the classes that you want included and another column called "Threshold" listing the score threshold (a decimal value between 0 and 1) to use to define apparent detections for each class. Alternatively, you can supply a text string consisting of class codes (or groups of class codes) followed by the score threshold to use for each class or group of classes, e.g. ``"STOC_4Note 0.50 STOC_Series Strix_Whistle 0.75"`` (the string must be enclosed in quotes, since it includes spaces).
  
- -w (Worker processes)
+ ``-w`` (Worker processes)
 	Number of worker processes to use when generating spectrograms. By default, pycnet will use the number of logical CPU cores on your machine, as this is typically the fastest option. Specify a lower number if you want to reserve some CPU power for other tasks. Note that processing speed can be affected by other factors, e.g. the read and write speeds of the drives involved, so using more worker processes is not always faster.
 
 Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the processing mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.

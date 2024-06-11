@@ -33,6 +33,10 @@ Functions:
         Produce a table of apparent detections of one or more target 
         classes for manual review.
 
+    parseStrReviewCriteria
+        Read a mapping of target classes to score thresholds from a
+        string provided by the user.
+
     readPredFile
         Read a table of PNW-Cnet class scores from a CSV file.
 
@@ -281,6 +285,48 @@ def readReviewSettings(review_settings_file):
     except:
         print("Could not determine intended settings.")
         return
+
+
+def parseStrReviewCriteria(crit_string):
+    """Map target classes to score thresholds based on a string.
+
+    The crit_string argument should include class codes or groups of 
+    class codes alternating with the score threshold to use for each
+    class or group of classes, e.g.
+    
+    ``"BRMA1 0.5 STVA_8Note STVA_Series 0.95"``
+
+    Args:
+    
+        crit_string (str): A string listing classes (singly or in
+            groups) alternating with the score threshold to use for 
+            each class or group.
+
+    Returns:
+    
+        dict: A dictionary of score thresholds indexed by class code.
+    """
+
+    crit_list = []
+
+    thresh_patt = re.compile("[0]*?\\.[0-9]+")
+    class_patt = re.compile("[A-Za-z0-9_]+")
+    class_groups = list(filter(lambda x: x != '', re.split(thresh_patt, crit_string)))
+    thresholds = re.findall(thresh_patt, crit_string)
+
+    if len(class_groups) != len(thresholds):
+        review_criteria = None
+
+    else:
+        for i in range(len(class_groups)):
+            add_classes = re.findall(class_patt, class_groups[i])
+            thresh = float(thresholds[i])
+            add_crit = [(j, thresh) for j in add_classes]
+            crit_list.extend(add_crit)
+
+        review_criteria = dict(crit_list)
+
+    return review_criteria
 
 
 def getDefaultReviewSettings(cnet_version):

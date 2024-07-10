@@ -315,7 +315,7 @@ def parseStrReviewCriteria(crit_string):
     thresholds = re.findall(thresh_patt, crit_string)
 
     if len(class_groups) != len(thresholds):
-        review_criteria = None
+        settings_dict = None
 
     else:
         for i in range(len(class_groups)):
@@ -324,9 +324,9 @@ def parseStrReviewCriteria(crit_string):
             add_crit = [(j, thresh) for j in add_classes]
             crit_list.extend(add_crit)
 
-        review_criteria = dict(crit_list)
+        settings_dict = dict(crit_list)
 
-    return review_criteria
+    return settings_dict
 
 
 def getDefaultReviewSettings(cnet_version):
@@ -566,11 +566,11 @@ def makeReviewTable(pred_table, cnet_version="v5", review_settings=None):
         review_df["THRESHOLD"] = thresh_list
 
         output_cols = ["Filename", "TOP1MATCH", "TOP1DIST", "THRESHOLD", 
-                        "Area", "Site", "Stn", "Part", "Rec_Day", 
-                        "Rec_Week", "AUTO_TAG"] + class_names
+                        "PRIORITY", "Area", "Site", "Stn", "Part", 
+                        "Rec_Day", "Rec_Week", "AUTO_TAG"] + class_names
 
-        review_df["Class_Order"] = [review_classes.index(x) for x in review_df["TOP1MATCH"]]
-        review_df.sort_values(by=["Filename", "Class_Order"], inplace=True)
+        review_df["PRIORITY"] = [review_classes.index(x)+1 for x in review_df["TOP1MATCH"]]
+        review_df.sort_values(by=["Filename", "PRIORITY"], inplace=True)
         
         tags_all = review_df.groupby("Filename").agg(AUTO_TAG=pd.NamedAgg(column="TOP1MATCH", aggfunc=lambda x: '+'.join(sorted(list(set(x))))))
         review_df = review_df.merge(tags_all, on="Filename", how="left")
@@ -613,7 +613,7 @@ def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_sett
 
     output_cols = ["FOLDER", "IN_FILE", "PART", "CHANNEL", "OFFSET", 
     "DURATION", "DATE", "TIME", "OFFSET_MMSS", "TOP1MATCH", "TOP1DIST", "THRESHOLD", 
-    "SORT", "AUTO_TAG", "VOCALIZATIONS", "MANUAL_ID"]
+    "PRIORITY", "SORT", "AUTO_TAG", "VOCALIZATIONS", "MANUAL_ID"]
 
     review_df = makeReviewTable(pred_table, cnet_version, review_settings)
     if review_df.empty:

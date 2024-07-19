@@ -366,43 +366,43 @@ CLE_36702_v5_review_kscope.csv
 		
 		CHANNEL
 			Channel of the audio. Always 1.
-		
+
 		OFFSET
 			Location of the clip within IN_FILE in seconds.
-		
+
 		DURATION
 			Length of the clip in seconds.
-		
+
 		DATE
 			Calendar date at the beginning of the clip. May differ from the timestamp in the IN_FILE filename if that recording went past midnight.
-		
+
 		TIME
 			Time at the beginning of the clip.
-		
+
 		OFFSET_MMSS
 			Location of the clip within IN_FILE in human-readable units.
-		
+
 		TOP1MATCH
 			The *first* class listed in the review settings dictionary for which the clip exceeded the corresponding score threshold. Each clip will only appear once in the review file, even if it met the threshold for multiple target classes, and the value in TOP1MATCH is not necessarily the class to which PNW-Cnet assigned the highest score for this clip. The AUTO_TAG field (see below) lists all the classes for which the clip met the threshold.
-		
+
 		TOP1DIST
 			Class score assigned to the clip by PNW-Cnet for the class in TOP1MATCH. Again, this is not necessarily the highest class score for the clip in question, since TOP1MATCH partly depends on the order that classes are listing in the review settings dictionary.
-		
+
 		THRESHOLD
 			Threshold used to define apparent detections for the class in TOP1MATCH, as defined in the review settings dictionary.
-			
+
 		PRIORITY
 			Position of the class in TOP1MATCH among classes included in the review settings dictionary. 
-		
+
 		SORT
-			Concatenation of TOP1MATCH, FOLDER, and sequential week of recording for this site. Used for more convenient sorting of the review_kscope file when reviewing detections.
-		
+			Concatenation of PRIORITY, TOP1MATCH, FOLDER, and sequential week or day of recording for this site. Used for more convenient sorting of the review_kscope file when reviewing detections.
+
 		AUTO_TAG
 			Concatenation of all classes listed in the review settings dictionary for which the clip met the threshold, in alphabetical order, delimited by plus signs (e.g. ``BUVI1+GLGN1``).
-		
+
 		VOCALIZATIONS
 			Dummy column, possibly unnecessary. Value is always 1.
-		
+
 		MANUAL_ID
 			Column to hold species IDs and other tags added manually in Kaleidoscope. This field will always be blank when the review file is created. If you plan to tag the review file manually, we recommend saving the edited version under a different filename (e.g. ``CLE_36702_review_kscope_TAGGED.csv``) to avoid the possibility of accidentally overwriting the tags you have applied.
 

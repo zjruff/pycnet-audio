@@ -24,7 +24,7 @@ Functions:
     
     getSourceFolders
         Get locations of a set of files within a directory tree.
-    
+
     makeKscopeReviewTable
         Produce a table of apparent detections, formatted to be 
         exported as a CSV file and browsed / tagged in Kaleidoscope.
@@ -219,7 +219,7 @@ def getSourceFile(clip_name):
         return (source_file, str_part)
 
 
-def getSourceFolders(clip_list, top_dir):
+def getSourceFolders(clip_list, mode="from_source_files", top_dir="", prefix=""):
     """Get locations of a set of files within a directory tree.
 
     This function will attempt to associate each spectrogram image
@@ -232,9 +232,23 @@ def getSourceFolders(clip_list, top_dir):
 
         clip_list (list): A list of names of spectrogram image files.
 
+        mode (str): Either "from_source_files" or "from_clip_names". If
+            "from_source_files", source folders will be inferred by 
+            joining the source filename with the .wav inventory table
+            under top_dir, which will be created if it does not already
+            exist. If "from_clip_names", the source folders will be
+            constructed by combining the station code in the filename
+            of each clip with an optional prefix.
+
         top_dir (str): Path to the root of the directory tree 
             containing the source .wav files. Values in the FOLDER 
-            field will be generated relative to this directory.
+            field will be generated relative to this directory. Used if
+            mode == "from_source_files".
+
+        prefix (str): Prefix to be combined with the stn
+            ID code inferred from the name of each clip in order to 
+            construct the source folder. Used if mode == 
+            "from_clip_names".
 
     Returns:
 
@@ -246,21 +260,65 @@ def getSourceFolders(clip_list, top_dir):
     source_file_list, part_list = zip(*[getSourceFile(clip) for clip in clip_list])
     source_file_df = pd.DataFrame(data={"Filename": clip_list, "IN_FILE": source_file_list, "PART": part_list})
     
-    wav_inv_path = os.path.join(top_dir, "{0}_wav_inventory.csv".format(os.path.basename(top_dir)))
-    if not os.path.exists(wav_inv_path):
-        wav_df = pycnet.file.inventoryFolder(top_dir)
-    else:
-        wav_df = pd.read_csv(wav_inv_path)
+    if mode == "from_source_files":
+        wav_inv_path = os.path.join(top_dir, "{0}_wav_inventory.csv".format(os.path.basename(top_dir)))
+        if not os.path.exists(wav_inv_path):
+            wav_df = pycnet.file.inventoryFolder(top_dir)
+        else:
+            wav_df = pd.read_csv(wav_inv_path)
 
-    wav_df.rename(columns={"Folder": "FOLDER", "Filename": "IN_FILE"}, inplace=True)
+        wav_df.rename(columns={"Folder": "FOLDER", "Filename": "IN_FILE"}, inplace=True)
 
-    joined_df = source_file_df.merge(wav_df, how="left", on="IN_FILE")
+        joined_df = source_file_df.merge(wav_df, how="left", on="IN_FILE")
+        
+        if joined_df.shape[0] != source_file_df.shape[0]:
+            print("Warning! Either source files could not be located for all clips or some clips are associated with duplicate filenames.")
+            return
+        else:
+            return joined_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
     
-    if joined_df.shape[0] != source_file_df.shape[0]:
-        print("Warning! Either source files could not be located for all clips or some clips are associated with duplicate filenames.")
-        return
-    else:
-        return joined_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
+    elif mode == "from_clip_names":
+        stn_list = [prefix + re.split("[-._]", clip)[2] for clip in clip_list]
+
+        source_file_df.insert(loc=0, column="FOLDER", value=stn_list)
+
+        return source_file_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
+
+
+
+# def inferSourceFolders(clip_list, prefix=""):
+    # """Infer source folders from filenames for a set of clips.
+    
+    # This function is intended to provide the option of creating a
+    # review file from a set of class scores when the audio data are not
+    # present locally. Instead of checking the clips against an inventory
+    # of .wav files, it infers the name of the station folder from the
+    # structure of the clip filenames, combined with an optional prefix,
+    # e.g. "Stn_".
+    
+    # Args:
+        
+        # clip_list (list): A list of names of spectrogram image files.
+        
+        # prefix (str): String that will be prepended to the station code
+            # as inferred from the clip filenames to populate the FOLDER
+            # field.
+        
+    # Returns:
+        
+        # Pandas.DataFrame: DataFrame listing the folder inferred from
+        # the clip filenames.
+    
+    # """
+    # source_file_list, part_list = zip(*[getSourceFile(clip) for clip in clip_list])
+    # source_file_df = pd.DataFrame(data={"Filename": clip_list, "IN_FILE": source_file_list, "PART": part_list})
+
+    # stn_list = [prefix + re.split("[-._]", clip)[2] for clip in clip_list]
+
+    # source_file_df.insert(loc=0, column="FOLDER", value=stn_list)
+
+    # return source_file_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
+        
 
 
 def readReviewSettings(review_settings_file):
@@ -582,29 +640,35 @@ def makeReviewTable(pred_table, cnet_version="v5", review_settings=None):
     return review_df
 
 
-def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_settings=None, timescale="weekly"):
+def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_settings=None, timescale="weekly", infer_source_folders=False, source_folder_prefix=""):
     """Extract & format apparent detections for review in Kaleidoscope.
 
     Args:
-        
+
         pred_table (Pandas.DataFrame): DataFrame listing a set of image
             filenames and the class scores produced by PNW-Cnet for 
             each image.
-        
+
         target_dir (str): Path to the root of the directory tree 
             containing the audio data.
-        
+
         cnet_version (str): The version of PNW-Cnet used to generate 
             the class scores (either "v4" or "v5").
-        
+
         review_settings (dict): Dictionary mapping target classes to 
             score thresholds. See makeReviewTable for details.
-        
+
         timescale (str): The temporal scale ("daily" or "weekly") at 
             which to tally the apparent detections of each class.
 
+        infer_source_folders (bool): Construct source folders based on
+            clip filenames instead of checking a .wav inventory file.
+
+        source_folder_prefix (str): Prefix to combine with the station
+            ID code to construct the names of source folders.
+
     Returns:
-        
+
         Pandas.DataFrame: DataFrame listing apparent detections of one 
         or more classes, formatted to be written to a CSV file which 
         will be readable and editable using Wildlife Acoustics' 
@@ -621,7 +685,11 @@ def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_sett
     else:
         n_clips = review_df.shape[0]
 
-        source_df = getSourceFolders(review_df.Filename, target_dir)
+        if infer_source_folders:
+            source_df = getSourceFolders(review_df.Filename, mode="from_clip_names", prefix=source_folder_prefix)
+        else:
+            source_df = getSourceFolders(review_df.Filename, mode="from_source_files", top_dir=target_dir)
+
         output_df = review_df.merge(source_df, how="inner", on="Filename")
 
         output_df["OFFSET"] = [12*(int(p)-1) for p in output_df.Part]
@@ -640,9 +708,9 @@ def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_sett
         output_df["OFFSET_MMSS"] = [getReadableOffset(i) for i in output_df.OFFSET]
 
         if timescale == "weekly":
-            output_df["SORT"] = ["{0}_Stn_{1}_Week_{2:02d}".format(*x) for x in zip(output_df.TOP1MATCH, output_df.Stn, output_df.Rec_Week)]
+            output_df["SORT"] = ["{0:03d}_{1}_Stn_{2}_Week_{3:02d}".format(*x) for x in zip(output_df.PRIORITY, output_df.TOP1MATCH, output_df.Stn, output_df.Rec_Week)]
         else:
-            output_df["SORT"] = ["{0}_Stn_{1}_Day_{2:03d}".format(*x) for x in zip(output_df.TOP1MATCH, output_df.Stn, output_df.Rec_Day)]
+            output_df["SORT"] = ["{0:03d}_{1}_Stn_{2}_Day_{3:03d}".format(*x) for x in zip(output_df.PRIORITY, output_df.TOP1MATCH, output_df.Stn, output_df.Rec_Day)]
 
         kscope_df = output_df[output_cols].sort_values(by=["TOP1MATCH", "IN_FILE", "PART"])
 

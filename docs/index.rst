@@ -228,33 +228,36 @@ The available optional arguments are as follows:
 
  ``-h`` (Help)
 	Prints a summary of the available options and exits. This option is a special case, as it can be used without specifying a mode or target directory.
-	
+
  ``-a`` (Auto-cleanup)
 	Recursively delete the temporary folder that was created to hold the spectrogram image files once processing is complete. This flag does not need to be paired with a value.
- 
+
  ``-c`` (Cnet version)
 	The version of the PNW-Cnet model to use when generating class scores. Options: "v4" or "v5". Default: v5.
- 
+
  ``-i`` (Image directory) 
 	Allows you to specify a location where the temporary spectrogram directory should be created. If not provided, the spectrograms will be generated in a folder called Temp within the target directory. This can improve processing speed, e.g. generating spectrograms in a folder on a solid-state drive will allow you to take advantage of the SSD's higher read and write speeds.
- 
+
  ``-l`` (Log output to file)
 	Tell pycnet to copy output messages to a file in the target directory, in addition to displaying them in the console. This flag does not need to be paired with a value. 
- 
+
  ``-o`` (Output file)
 	Specify a name to be used for the review file instead of the default name. Useful if you want to experiment with different review settings without overwriting a previously generated file.
- 
+
  ``-p`` (Prefix)
 	Use a specific prefix when renaming files rather than generating the prefix automatically based on folder structure.
- 
+
  ``-q`` (Quiet mode)
 	Suppress progress bars when generating spectrograms and class scores. This flag does not need to be paired with a value.
- 
+
  ``-r`` (Review settings)	
 	You can specify review criteria in two different ways. First, you can supply the path to a CSV file specifying criteria to use when generating the review file. The file provided must have a column called "Class" listing the codes of the classes that you want included and another column called "Threshold" listing the score threshold (a decimal value between 0 and 1) to use to define apparent detections for each class. Alternatively, you can supply a text string consisting of class codes (or groups of class codes) followed by the score threshold to use for each class or group of classes, e.g. ``"STOC_4Note 0.50 STOC_Series Strix_Whistle 0.75"`` (the string must be enclosed in quotes, since it includes spaces).
- 
+
  ``-w`` (Worker processes)
 	Number of worker processes to use when generating spectrograms. By default, pycnet will use the number of logical CPU cores on your machine, as this is typically the fastest option. Specify a lower number if you want to reserve some CPU power for other tasks. Note that processing speed can be affected by other factors, e.g. the read and write speeds of the drives involved, so using more worker processes is not always faster.
+
+ ``-k`` (sKip image check)
+	Don't check that all spectrogram image files can be loaded before attempting to generate class scores. Skipping this step saves a bit of time, especially with larger datasets, but if the model encounters an image file that can't be loaded, the program will crash without saving any class scores to file. Unloadable image files can occur when the audio files are incomplete or corrupted.
 
 Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the processing mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.
 

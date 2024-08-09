@@ -26,9 +26,6 @@ Functions:
     logMessage
         Print a message and optionally write it to a log file.
 
-    makeFileInventory
-        Build an inventory of .wav files in the target folder.
-
     parsePycnetArgs
         Define command-line options for the 'pycnet' console script.
 
@@ -66,10 +63,15 @@ def getWavPaths(wav_inventory, top_dir):
     """
     
     wi = wav_inventory
+    n_wavs = len(wi)
+    
     if os.path.exists(wi["Folder"][0]):
-        wav_paths = [os.path.join(wi["Folder"][i], wi["Filename"][i]) for i in range(len(wi))]
+        comps = zip(wi["Folder"], wi["Filename"])
     else:
-        wav_paths = [os.path.join(top_dir, wi["Folder"][i], wi["Filename"][i]) for i in range(len(wi))]
+        comps = zip([top_dir for i in range(n_wavs)], wi["Folder"], wi["Filename"])
+    
+    wav_paths = [os.path.join(*i) for i in comps]
+    
     return wav_paths
 
 
@@ -100,7 +102,7 @@ def buildProcQueue(input_dir, image_dir, n_chunks=0):
     dir_name = os.path.basename(input_dir)
     inv_file = os.path.join(input_dir, "{0}_wav_inventory.csv".format(dir_name))
     
-    wav_inventory = pd.read_csv(inv_file)
+    wav_inventory = pycnet.file.readInventoryFile(inv_file)
     wav_paths = getWavPaths(wav_inventory, input_dir)
 
     total_dur = sum(wav_inventory["Duration"]) / 3600.
@@ -166,7 +168,7 @@ def generateSpectrograms(proc_queue, n_workers, show_prog=True):
     return
 
 
-def batchImageData(target_dir, batch_size=16):
+def batchImageData(target_dir, batch_size=16, check_images=False):
     """Supply batches of image data from a folder for classification.
 
     This function searches the target directory for image files with a
@@ -183,15 +185,27 @@ def batchImageData(target_dir, batch_size=16):
             Larger batches may allow faster processing at the cost of
             increased memory usage.
 
+        check_images (bool): Use pycnet.file.image.checkImages to 
+            check for PNG files that cannot be loaded and omit them
+            from the batched data.
+
     Returns:
-    
+
         dict: A dict containing "image_paths", a list of the full paths
         of all .png images in the target directory; "image_names", a 
-        list of the filenames of the same files; and "image_batches", 
-        a Keras DataFrameIterator.
+        list of the filenames of the same files; "image_batches", 
+        a Keras DataFrameIterator; "images_checked", a boolean 
+        indicating whether non-loadable images were omitted; and 
+        "bad_images", a list of image paths that could not be loaded,
+        or an empty list if check_images==False.
+
     """
 
-    image_paths = pycnet.file.findFiles(target_dir, ".png")
+    images = pycnet.file.image.findImages(target_dir, check_images)
+    
+    image_paths = images["good_images"]
+    bad_images = images["bad_images"]
+
     image_names = [os.path.basename(path) for path in image_paths]
     image_df = pd.DataFrame(data=image_paths, columns=["Filename"])
 
@@ -209,10 +223,16 @@ def batchImageData(target_dir, batch_size=16):
         class_mode = None,
         shuffle = False)
 
-    return {"image_paths": image_paths, "image_names": image_names, "image_batches": image_batches}
+    batch_dict = { "image_paths": image_paths, 
+        "image_names": image_names, 
+        "image_batches": image_batches, 
+        "images_checked": check_images, 
+        "bad_images": bad_images }
+
+    return batch_dict
 
 
-def generateClassScores(target_dir, model_path, show_prog=True):
+def generateClassScores(target_dir, model_path, show_prog=True, check_images=False):
     """Generate class scores for a set of spectrograms using PNW-Cnet.
 
     The DataFrame returned contains one column Filename for the names 
@@ -230,6 +250,10 @@ def generateClassScores(target_dir, model_path, show_prog=True):
 
         show_prog (bool): Whether to show a text-based progress bar as 
             the model processes batches of images.
+            
+        check_images (bool): Use pycnet.file.image.checkImages to 
+            check for PNG files that cannot be loaded and omit them
+            from the batched data.
 
     Returns:
 
@@ -237,7 +261,7 @@ def generateClassScores(target_dir, model_path, show_prog=True):
         each image file.
     """
 
-    i = batchImageData(target_dir)
+    i = batchImageData(target_dir, check_images=check_images)
     image_paths = i["image_paths"]
     image_names = i["image_names"]
     image_batches = i["image_batches"]
@@ -265,7 +289,7 @@ def generateClassScores(target_dir, model_path, show_prog=True):
     return predictions
 
 
-def generateEmbeddings(target_dir, cnet_version, show_prog=True):
+def generateEmbeddings(target_dir, cnet_version, show_prog=True, check_images=False):
     """Generate embeddings for a set of images using PNW-Cnet.
 
     Embeddings are the activation of the penultimate fully-connected 
@@ -285,6 +309,10 @@ def generateEmbeddings(target_dir, cnet_version, show_prog=True):
 
         show_prog (bool): Whether to show a text-based progress bar as
             the model processes batches of images.
+            
+        check_images (bool): Use pycnet.file.image.checkImages to 
+            check for PNG files that cannot be loaded and omit them
+            from the batched data.
 
     Returns:
 
@@ -293,7 +321,7 @@ def generateEmbeddings(target_dir, cnet_version, show_prog=True):
         "embeddings" contains the embeddings for each image file.
     """
 
-    i = batchImageData(target_dir)
+    i = batchImageData(target_dir, check_images)
     image_paths = i["image_paths"]
     image_names = i["image_names"]
     image_batches = i["image_batches"]
@@ -338,14 +366,14 @@ def logMessage(message, log_file_path=None):
     """
     if log_file_path is not None:
         with open(log_file_path, 'a') as log_file:
-            log_file.write(message)
+            log_file.write('\n' + message)
             
     print(message)
     
     return
 
 
-def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, output_file=None, log_to_file=False, show_prog=True, cleanup=False):
+def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, output_file=None, log_to_file=False, show_prog=True, cleanup=False, check_images=True):
     """Perform one or more processing operations on data in a folder.
 
     Basically runs through the functions above in a logical sequence to
@@ -391,6 +419,11 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
 
         cleanup (bool): Whether to delete spectrograms and temporary 
             folders when processing is complete.
+            
+        check_images (bool): Whether to verify that all spectrogram 
+            images can be loaded before attempting to generate class 
+            scores. Skipping this step will save a bit of time but the
+            program will crash if it encounters an unloadable image.
 
     Returns:
 
@@ -426,11 +459,11 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
     ### Inventory .wav files and set up processing directories ###
     if not os.path.exists(wav_inv_file):
         logMessage("Creating .wav inventory file...", proc_log_file)
-        wav_inventory = pycnet.file.inventoryFolder(target_dir, print_summary=False)
+        wav_inventory = pycnet.file.inventoryFolder(target_dir)
         output_files.append(wav_inv_file)
     else:
         logMessage("Using preexisting .wav inventory file...", proc_log_file)
-        wav_inventory = pd.read_csv(wav_inv_file)
+        wav_inventory = pycnet.file.readInventoryFile(wav_inv_file)
     
     logMessage('\n' + pycnet.file.summarizeInventory(wav_inventory) + '\n', proc_log_file)
 
@@ -480,9 +513,13 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         else:
             logMessage("\nGenerating class scores using PNW-Cnet {0}...\n".format(cnet_version), proc_log_file)
         
+        if not check_images:
+            logMessage("`check_images` parameter is set to False.", proc_log_file)
+            logMessage("Blithely assuming that all images will load correctly...\n", proc_log_file)
+        
         model_path = v4_model_path if cnet_version == "v4" else v5_model_path
         
-        class_scores = generateClassScores(image_dir, model_path, show_prog)
+        class_scores = generateClassScores(image_dir, model_path, show_prog, check_images)
         
         class_scores.to_csv(class_score_file, index = False)
         
@@ -585,6 +622,9 @@ def parsePycnetArgs():
 
     parser.add_argument("-a", dest="auto_cleanup", action="store_true",
         help="Remove spectrogram image files and temporary folders when class scores have been generated.")
+        
+    parser.add_argument("-k", dest="skip_image_check", action="store_true",
+        help="Do not check whether all images can be loaded before generating class scores.")
 
     args = parser.parse_args()
     

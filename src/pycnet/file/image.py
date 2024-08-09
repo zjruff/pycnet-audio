@@ -8,6 +8,10 @@ Functions:
     checkImages
         Use a set of worker processes to check all the image files in a
         directory tree.
+        
+    findImages
+        Locate PNG files in a directory tree and optionally check if
+        they can be loaded.
     
 Classes:
 
@@ -41,7 +45,37 @@ def checkImageFile(image_path):
         return False
 
 
-def checkImages(top_dir, n_workers=0):
+def findImages(top_dir, check_images=False):
+    """Locate PNG image files in a directory tree.
+    
+    Args:
+    
+        top_dir (str): Path to the root of the directory tree 
+            containing image files.
+            
+        check (bool): Verify that image files can be loaded.
+    
+    Returns:
+    
+        dict: A dict containing paths to image files found in the
+        directory. If check_images==True, "good_images" is a list of
+        paths of image files that were loaded successfully, and 
+        "bad_images" is a list of paths of image files that could not
+        be loaded. "images_checked" is a bool indicating the value of
+        check_images.
+    
+    """
+    image_files = pycnet.file.findFiles(top_dir, ".png")
+    if check_images:
+        image_dict = checkImages(top_dir)
+        image_dict["images_checked"] = True
+    else:
+        image_dict = {"good_images": image_files, "bad_images": [], "images_checked": False}
+    
+    return image_dict
+
+
+def checkImages(top_dir, n_workers=0, verbose=True):
     """Check all the .png images in a folder.
     
     Arguments:
@@ -51,6 +85,8 @@ def checkImages(top_dir, n_workers=0):
         
         n_workers (int): Number of worker processes to use. Defaults to
             the number of logical CPU cores.
+            
+        verbose (bool): Print the results of the image checking.
     
     Returns:
         
@@ -64,8 +100,9 @@ def checkImages(top_dir, n_workers=0):
         n_workers = min(mp.cpu_count, n_workers)
 
     pngs = pycnet.file.findFiles(top_dir, ".png")
-    print("\nFound {0} PNG files under {1}.\n".format(len(pngs), top_dir))
-    print("Checking images... ")
+    if verbose:
+        print("\nFound {0} PNG files under {1}.\n".format(len(pngs), top_dir))
+        print("Checking images... ", end='')
     
     img_queue, bad_img_queue = mp.JoinableQueue(), mp.Queue()
     for i in pngs:
@@ -84,16 +121,21 @@ def checkImages(top_dir, n_workers=0):
     bad_imgs = []
 
     if n_bad_imgs > 0:
-        print("\n{0} images could not be loaded.".format(n_bad_imgs))        
+        if verbose:
+            print("\n{0} images could not be loaded.\n".format(n_bad_imgs))        
         while bad_img_queue.qsize() > 0:
             bad_imgs.append(bad_img_queue.get())
         with open(os.path.join(top_dir, "Bad_Images.csv"), 'w') as outfile:
             outfile.write("Path\n")
             outfile.write('\n'.join(sorted(bad_imgs)))
     else:
-        print("\nAll images loaded successfully. No errors detected.")
+        if verbose:
+            print("\nAll images loaded successfully. No errors detected.\n")
     
-    return sorted(bad_imgs)
+    bad_imgs.sort()
+    good_imgs = [x for x in pngs if not x in bad_imgs]
+    
+    return {"good_images": good_imgs, "bad_images": bad_imgs}
 
 
 class ImageChecker(mp.Process):

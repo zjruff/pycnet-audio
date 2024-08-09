@@ -26,6 +26,9 @@ Functions:
         Rename files with a given extension in a directory tree (or 
         undo this operation if previously performed).
 
+    readInventoryFile
+        Read a .wav file inventory from a CSV file.
+
     removeSpectroDir
         Recursively remove temporary files and folders.
 
@@ -114,8 +117,11 @@ def getFolder(file_path, top_dir):
     """
 
     file_dir = Path(file_path).parent
-    top_dir_path = Path(top_dir)
-    file_folder = file_dir.relative_to(top_dir_path)
+    if file_dir == Path(top_dir):
+        file_folder = ''
+    else:
+        top_dir_path = Path(top_dir)
+        file_folder = file_dir.relative_to(top_dir_path)
     return file_folder
 
 
@@ -160,6 +166,26 @@ def makeFileInventory(path_list, top_dir, use_abs_path=False):
     file_df = pd.DataFrame(data = file_dict)
 
     return file_df
+
+
+def readInventoryFile(inventory_path):
+    """Read a .wav file inventory dataframe from a CSV file.
+
+    Args:
+
+        inventory_path (str): Path to a CSV file containing information on .wav
+            files within a folder.
+
+    Returns:
+
+        pandas.DataFrame: DataFrame with one row for each .wav file 
+        listing its folder (absolute or relative to top_dir), filename,
+        size in bytes, and duration in seconds.
+
+    """
+    wav_inventory = pd.read_csv(inventory_path, converters={"Folder": str, "Filename": str, "Size": int, "Duration": float})
+    
+    return wav_inventory
 
 
 def summarizeInventory(wav_inventory):

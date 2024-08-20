@@ -10,8 +10,22 @@ up a dedicated Conda environment for easier dependency management.
 ## Installation
 
 `pycnet-audio` is available from 
-[the Python Package Index](https://pypi.org/project/pycnet-audio/).
-Once you have set up a compatible Python environment, just run
+[the Python Package Index](https://pypi.org/project/pycnet-audio/) and can be
+installed using `pip`.
+
+First you will need to set up a compatible conda environment like so:
+
+```
+conda create -n pycnet -c conda-forge sox python=3.8
+```
+
+Then activate your environment...
+
+```
+conda activate pycnet
+``` 
+
+Finally, install the package from PyPI:
 
 ```
 pip install pycnet-audio

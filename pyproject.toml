@@ -38,7 +38,7 @@ classifiers = [
 
 
 [project.urls]
-Documentation = "https://readthedocs.org"
+Documentation = "https://pycnet-audio.readthedocs.io/"
 Repository = "https://github.com/zjruff/pycnet-audio"
 Issues = "https://github.com/zjruff/pycnet-audio/issues"
 

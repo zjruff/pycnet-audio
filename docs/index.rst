@@ -101,7 +101,7 @@ Hit Enter to delete the temporary test folder, then give yourself a pat on the b
 Using pycnet
 ============
 
-We have a defined processing workflow for bioacoustics data which consists of a number of distinct steps that are completed in sequence, beginning with a set of audio files that have been retrieved from the field and ending with a set of target species detections that can be analyzed to make ecological inferences. The steps in our workflow are as follows:
+In the course of running a large-scale acoustic monitoring program, we have developed a reasonably efficient workflow for processing bioacoustics data. This workflow consists of a number of distinct steps that are completed in sequence, beginning with a set of audio files that have been retrieved from the field and ending with a set of target species detections that can be analyzed to make ecological inferences. The steps in our workflow are as follows:
 
 1. The files are organized in a directory structure that reflects the field sampling scheme. Each recording station has a folder containing the audio files from that station, and each field site has a folder containing the station folders from that site. Filenames are standardized to include information on where and when each recording was made.
 2. Audio files from each field site are inventoried and summarized at the site and station level.
@@ -257,7 +257,7 @@ The available optional arguments are as follows:
 	Number of worker processes to use when generating spectrograms. By default, pycnet will use the number of logical CPU cores on your machine, as this is typically the fastest option. Specify a lower number if you want to reserve some CPU power for other tasks. Note that processing speed can be affected by other factors, e.g. the read and write speeds of the drives involved, so using more worker processes is not always faster.
 
  ``-k`` (sKip image check)
-	Don't check that all spectrogram image files can be loaded before attempting to generate class scores. Skipping this step saves a bit of time, especially with larger datasets, but if the model encounters an image file that can't be loaded, the program will crash without saving any class scores to file. Unloadable image files can occur when the audio files are incomplete or corrupted.
+	Instructs the program not to check whether spectrogram image files can be loaded before attempting to generate class scores. Skipping this step saves a bit of time, especially with larger datasets, but if the model encounters an image file that can't be loaded, the program will crash without saving any class scores to file. Unloadable image files can occur when the audio files are incomplete or corrupted. If a crash does occur, you can always rerun the operation with this option omitted; the main cost is wasted processing time.
 
 Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the processing mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.
 

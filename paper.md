@@ -15,7 +15,7 @@ authors:
  - name: Damon B. Lesmeister
    orcid: 0000-0003-1102-0122
    equal-contrib: true
-   affiliation: "2"
+   affiliation: "1, 2"
 
 affiliations:
  - name: Department of Fisheries, Wildlife, and Conservation Sciences, Oregon State University, Corvallis, USA

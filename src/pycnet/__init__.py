@@ -13,6 +13,7 @@ import os
 
 from . import cnet
 from . import file
+from . import plot
 from . import process
 from . import prog
 from . import review

@@ -4,22 +4,27 @@
 interface and a useful Python API for processing audio data using 
 PNW-Cnet, a deep learning model developed for bioacoustics research.
 
-This software requires Python version 3.8 and SoX. We recommend setting
-up a dedicated Conda environment for easier dependency management.
-
 ## Installation
 
-`pycnet-audio` is available from 
-[the Python Package Index](https://pypi.org/project/pycnet-audio/) and can be
-installed using `pip`.
+`pycnet-audio` is available from the
+[Python Package Index](https://pypi.org/project/pycnet-audio/) and can be
+installed using `pip`. However, you will first need to install a compatible 
+version of Python (currently only Python 3.8), as well as SoX. For ease of 
+use, we recommend setting up a dedicated Conda environment for running 
+`pycnet-audio`. We find it is easiest to do so using Miniconda.
 
-First you will need to set up a compatible conda environment like so:
+[Install Miniconda](https://docs.anaconda.com/miniconda/), then open the
+Anaconda Prompt program and run the following command:
 
 ```
 conda create -n pycnet -c conda-forge sox python=3.8
 ```
 
-Then activate your environment...
+This will create a new conda environment called `pycnet` with Python version 
+3.8 and will install the required `sox` package from the 
+[conda-forge](https://conda-forge.org/) repository.
+
+Next, activate your environment...
 
 ```
 conda activate pycnet

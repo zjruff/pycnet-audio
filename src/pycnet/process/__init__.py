@@ -3,6 +3,10 @@ audio data using PNW-Cnet.
 
 Functions:
 
+    batchImageData
+        Read image files from a folder and generate batches of the 
+        image data for classification using the PNW-Cnet model.
+
     buildProcQueue
         Create a JoinableQueue defining .wav files to be processed and 
         the directories where temporary spectrogram image files will be

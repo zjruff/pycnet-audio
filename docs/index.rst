@@ -301,6 +301,7 @@ There must be a column called ``Class`` listing the target classes to be include
    pycnet <modules>
    pycnet.cnet <pycnet.cnet>
    pycnet.file <pycnet.file>
+   pycnet.plot <pycnet.plot>
    pycnet.process <pycnet.process>
    pycnet.prog <pycnet.prog>
    pycnet.review <pycnet.review>
@@ -316,10 +317,13 @@ CLE_36702_wav_inventory.csv
 	
 		Folder
 			Location of the file relative to CLE_36702.
+
 		Filename
 			Name of the .wav file.
+
 		Size
 			Size of the file in bytes.
+
 		Duration
 			Duration of the recording in seconds.
 
@@ -328,6 +332,7 @@ CLE_36702_v5_class_scores.csv
 	
 		Filename
 			Name of each spectrogram image file. 
+
 		[ACCO1, ACGE1, ..., ZOLE1] 
 			Class scores for each of the 135 PNW-Cnet v5 target classes for each image. Each class score is a decimal value in the range [0,1]. Higher class scores indicate a stronger match. If the class scores were generated using PNW-Cnet v4 then there will instead be 51 class score columns [AEAC, BRCA, ..., ZEMA], but the structure will be the same.
 	
@@ -336,22 +341,31 @@ CLE_36702_v5_detection_summary.csv
 	
 		Area
 			Study area ID. First component of the .wav filenames; in this case CLE.
+
 		Site
 			Field site ID. Second component of the .wav filenames; in this case 36702.
+
 		Stn
 			Recording station ID. Third component of the .wav filenames.
+
 		Date
 			Calendar date.
+
 		Rec_Day
 			Sequential day of recording at this site, equal to ``Date - min(Date) + 1``.
+
 		Rec_Week
 			Sequential week of recording at this site, equal to ``int(Rec_Day / 7) + 1``.
+
 		Clips
 			Number of 12-second clips in the class_scores file for this combination of Area, Site, Stn, and Date.
+
 		Effort
 			Hours of recording for this combination of Area, Site, Stn, and Date, equal to ``Clips / 300``.
+
 		Threshold
 			Score threshold used to tally apparent detections.
+
 		[ACCO1, ACGE1, ..., ZOLE1]
 			Number of apparent detections (i.e., the number of Clips with score >= Threshold) for each of the 135 PNW-Cnet v5 target classes for this combination of Area, Site, Stn, Date, and Threshold. If the class scores were generated using PNW-Cnet v4 then there will instead be 51 columns [AEAC, BRCA, ..., ZEMA], but the structure will be the same.
 
@@ -413,9 +427,34 @@ CLE_36702_v5_review_kscope.csv
 Appendix B. PNW-Cnet target classes
 ===================================
 
-The following table lists the target classes (sonotypes) detected by versions v4 and v5 of the PNW-Cnet model. The 'v4_Code' and 'v5_Code' columns list the abbreviated class codes which are used as column headers for columns containing class scores in the PNW-Cnet prediction files. All classes that were included in PNW-Cnet v4 were subsequently also included in PNW-Cnet v5, but the class codes were updated between versions to reflect more consistent naming conventions.
+The following table lists the target classes (sonotypes) detected by versions v4 and v5 of the PNW-Cnet model. The ``v4_Code`` and ``v5_Code`` columns list the abbreviated class codes which are used as column headers for columns containing class scores in the PNW-Cnet prediction files. All classes that were included in PNW-Cnet v4 were subsequently also included in PNW-Cnet v5, but the class codes were updated between versions to reflect more consistent naming conventions.
 
 .. csv-table:: Target Classes
 	:file: ../src/pycnet/cnet/target_classes.csv
 	:header-rows: 1
 
+
+Appendix C. Plotting apparent detections
+========================================
+
+As of version 0.5.6, pycnet includes a utility for visualizing apparent detections based on the ``detection_summary`` file that is generated when you process data. This functionality makes use of the ``seaborn`` Python package, which is now one of the dependencies that will automatically be installed when you run ``pip install pycnet-audio``.
+
+To generate a plot of detections, you run the command ``plot_dets`` with two required arguments: 1. The path to the ``detection_summary`` file you want to use, and 2. A text string listing the target classes to be plotted and the detection threshold for each class or group of classes, similar to how you specify review criteria using the ``-r`` flag with the ``pycnet`` command. For instance, to plot apparent detections for both the HYPI1 (pileated woodpecker) and COAU1 (northern flicker) classes, using a threshold of 0.95 for both, you would run
+::
+
+	plot_dets F:\COA_23459\COA_23459_v5_detection_summary.csv "HYPI1 COAU1 0.95"
+
+The resulting plot will look something like this:
+
+.. image:: ./example_plot.png
+	:width: 600
+	:alt: A bar plot showing detections by week at four recording stations for two classes
+
+The default visualization is a bar plot showing detections of each class by recording week at the threshold specified, with each class shown in a different color, faceted by recording station, with a legend showing the detection threshold for each class. You can plot detections by date rather than by week by using the ``-d`` flag. Note that plotting more than three or four classes by date will likely result in a very busy figure. Also note that plotting detections of more than eight classes will result in colors being reused, as the palette used in the plots (the "Dark2" palette from the ColorBrewer package) is limited to eight colors.
+
+By default, the plot will pop up in a MatPlotLib viewer window, from which you can save it as an image file. Alternatively, you can use the ``-f`` flag and specify a filename to export the image file directly. The plot will be saved in PNG format at 300 dpi. If you provide a full path, the plot will be saved at that location, whereas if you only provide a filename, the plot will be saved in the same directory as the ``detection_summary`` file. If you want to save the image file without opening the viewer window, you can also use the ``-n`` flag to suppress the viewer window. (If you use the ``-n`` flag without specifying a destination file, the command will simply run without displaying or saving anything.) For instance, to generate the same plot as before and save it directly, run
+::
+
+	plot_dets F:\COA_23459\COA_23459_v5_detection_summary.csv "HYPI1 COAU1 0.95" -n -f test_plot.png
+
+The plotting functionality is fairly basic at the moment but will be expanded in future versions. Watch this space!

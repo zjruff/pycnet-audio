@@ -234,12 +234,12 @@ def plotDetections(df, criteria, timescale="weekly", show_plot=True, dest_file=N
     n_classes = len(criteria)
     pal = sns.color_palette("Dark2", n_classes)
     
-    plot_data["Dets"] = plot_data["Class"]+" \u2265 "+plot_data["Threshold"].astype(str)
+    plot_data["Target Class"] = plot_data["Class"]+" \u2265 "+plot_data["Threshold"].astype(str)
     
     p = sns.catplot(data=plot_data,
         x=time_var,
         y="Detections",
-        hue="Dets",
+        hue="Target Class",
         kind="bar",
         estimator=sum,
         errorbar=None,

@@ -1,7 +1,7 @@
 v4_Code,v5_Code,Sound,Category,Subcategory,Class,Order,Family,Genus,Species,Sci_Name
-NA,ACGE1,Northern goshawk series call,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Accipiter,atricapillus,Accipiter atricapillus
-NA,ACGE2,Northern goshawk scream,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Accipiter,atricapillus,Accipiter atricapillus
-NA,ACCO1,Cooper's hawk series call,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Accipiter,cooperii,Accipiter cooperii
+NA,ACGE1,American goshawk series call,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Astur,atricapillus,Astur atricapillus
+NA,ACGE2,American goshawk scream,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Astur,atricapillus,Astur atricapillus
+NA,ACCO1,Cooper's hawk series call,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Astur,cooperii,Astur cooperii
 NA,ACST1,Sharp-shinned hawk series call,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Accipiter,striatus,Accipiter striatus
 NA,BUJA1,Red-tailed hawk scream,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Buteo,jamaicensis,Buteo jamaicensis
 NA,BUJA2,Red-tailed hawk other call,Birds,Raptors,Aves,Accipitriformes,Accipitridae,Buteo,jamaicensis,Buteo jamaicensis

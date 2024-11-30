@@ -4,6 +4,7 @@ This interface can be accessed by calling "python -m pycnet [args]" or
 simply "pycnet [args]"
 """
 
+import os
 import pycnet
 
 def main():
@@ -20,7 +21,7 @@ def main():
     Run with the -h (help) flag, e.g. 'pycnet -h', to see all options.
     """
 
-    valid_modes = ["process", "spectro", "predict", "review", "inventory", "rename", "cleanup"]
+    valid_modes = ["process", "batch_process", "combine", "spectro", "predict", "review", "inventory", "rename", "cleanup"]
 
     args = pycnet.process.parsePycnetArgs()
 
@@ -33,34 +34,114 @@ def main():
         check_images = not args.skip_image_check
         auto_cleanup = args.auto_cleanup
         log_to_file = args.log_to_file
+        combine_output = args.combine_output
         
+
         if args.mode == "process":
             proc_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers]
-            pycnet.process.processFolder(*proc_args, review_settings=args.review_settings, output_file=args.output_file, log_to_file=log_to_file, show_prog=show_prog, cleanup=auto_cleanup, check_images=check_images)
+            
+            pycnet.process.processFolder(
+                *proc_args, 
+                review_settings=args.review_settings, 
+                output_file=args.output_file, 
+                log_to_file=log_to_file, 
+                show_prog=show_prog, 
+                cleanup=auto_cleanup, 
+                check_images=check_images)
+
+
+        elif args.mode == "batch_process":
+            dir_list_file_path = args.target_dir
+
+            try:
+                with open(dir_list_file_path) as dir_list_file:
+                    dir_list = [line.rstrip().replace('"', '') for line in dir_list_file.readlines()]
+            except:
+                print("\nCould not read list of target directories.\n")
+                exit()
+
+            dir_list = list(filter(os.path.isdir, dir_list))
+            if len(dir_list) == 0:
+                print("\nNo valid target directories provided.\n")
+                exit()
+
+            batch_args = [args.cnet_version, args.image_dir, args.n_workers]
+            pycnet.process.batchProcess(
+                dir_list, 
+                *batch_args, 
+                review_settings=args.review_settings, 
+                log_to_file=log_to_file, 
+                show_prog=show_prog, 
+                cleanup=auto_cleanup, 
+                check_images=check_images,
+                combine_output=combine_output)
+
+
+        elif args.mode == "combine":
+            dir_list_file_path = args.target_dir
+
+            try:
+                with open(dir_list_file_path) as dir_list_file:
+                    dir_list = [line.rstrip().replace('"', '') for line in dir_list_file.readlines()]
+            except:
+                print("\nCould not read list of target directories.\n")
+                exit()
+
+            dir_list = list(filter(os.path.isdir, dir_list))
+            if len(dir_list) == 0:
+                print("\nNo valid target directories provided.\n")
+                exit()
+            
+            combine_args = [dir_list, args.cnet_version, args.review_settings]
+            pycnet.process.combineOutputFiles(*combine_args)
+
+
 
         elif args.mode == "spectro":
             spectro_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir, args.n_workers]
-            pycnet.process.processFolder(*spectro_args, log_to_file=log_to_file, show_prog=show_prog, cleanup=auto_cleanup)
+            pycnet.process.processFolder(
+                *spectro_args, 
+                log_to_file=log_to_file, 
+                show_prog=show_prog, 
+                cleanup=auto_cleanup)
+
 
         elif args.mode == "predict":
             predict_args = [args.mode, args.target_dir, args.cnet_version, args.image_dir]
-            pycnet.process.processFolder(*predict_args, review_settings=args.review_settings, show_prog=show_prog, output_file=args.output_file, log_to_file=log_to_file, cleanup=auto_cleanup, check_images=check_images)
+            pycnet.process.processFolder(
+                *predict_args, 
+                review_settings=args.review_settings, 
+                show_prog=show_prog, 
+                output_file=args.output_file, 
+                log_to_file=log_to_file, 
+                cleanup=auto_cleanup, 
+                check_images=check_images)
+
 
         elif args.mode == "review":
             review_args = [args.mode, args.target_dir, args.cnet_version]
-            pycnet.process.processFolder(*review_args, review_settings=args.review_settings, output_file=args.output_file, log_to_file=log_to_file, cleanup=auto_cleanup)
+            pycnet.process.processFolder(
+                *review_args, 
+                review_settings=args.review_settings, 
+                output_file=args.output_file, 
+                log_to_file=log_to_file, 
+                cleanup=auto_cleanup)
+
 
         elif args.mode == "inventory":
             inv_args = [args.target_dir]
             pycnet.file.inventoryFolder(*inv_args)
 
+
         elif args.mode == "rename":
             rename_args = [args.target_dir, "wav"]
             pycnet.file.massRenameFiles(*rename_args)
             
+
         elif args.mode == "cleanup":
             cleanup_args = [args.target_dir, args.image_dir]
             pycnet.file.removeSpectroDir(*cleanup_args)
+
 
         else:
             pass

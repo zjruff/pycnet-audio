@@ -7,10 +7,21 @@ Functions:
         Read image files from a folder and generate batches of the 
         image data for classification using the PNW-Cnet model.
 
+    batchProcess
+        Perform a standard processing workflow on a list of folders
+        read from a text file.
+
+    blockMessage
+        Format a message with borders and padding for emphasis.
+
     buildProcQueue
         Create a JoinableQueue defining .wav files to be processed and 
         the directories where temporary spectrogram image files will be
         stored.
+
+    combineOutputFiles
+        Consolidate output files from multiple folders (e.g. as 
+        generated from a batch processing run).
 
     generateClassScores
         Generate class scores for a set of images using the PNW-Cnet 
@@ -43,8 +54,9 @@ import multiprocessing as mp
 import os
 import pandas as pd
 import pycnet
+import signal
 import tensorflow as tf
-
+from pathlib import Path
 from pycnet.cnet import v4_class_names, v5_class_names, v4_model_path, v5_model_path
 
 
@@ -157,17 +169,26 @@ def generateSpectrograms(proc_queue, n_workers, show_prog=True):
     image_dir = os.path.commonpath(spectro_dirs)
     done_queue = mp.Queue()
 
+    worker_pids = []
+
     for i in range(n_workers):
         worker = pycnet.file.wav.WaveWorker(wav_queue, done_queue, image_dir)
         worker.daemon = True
         worker.start()
+        worker_pids.append(worker.pid)
 
     if show_prog:
         prog_worker = pycnet.prog.ProgBarWorker(done_queue, n_wav_files)
         prog_worker.daemon = True
         prog_worker.start()
+        worker_pids.append(prog_worker.pid)
 
     wav_queue.join()
+    
+    for j in worker_pids:
+        os.kill(int(j), signal.SIGTERM)
+        
+    print(pycnet.prog.makeProgBar(n_wav_files, n_wav_files))
 
     return
 
@@ -206,7 +227,7 @@ def batchImageData(target_dir, batch_size=16, check_images=False):
     """
 
     images = pycnet.file.image.findImages(target_dir, check_images)
-    
+
     image_paths = images["good_images"]
     bad_images = images["bad_images"]
 
@@ -234,6 +255,26 @@ def batchImageData(target_dir, batch_size=16, check_images=False):
         "bad_images": bad_images }
 
     return batch_dict
+
+
+def _predictInProcess(q, *args):
+    """Wrap generateClassScores to run as a Process for memory safety.
+    
+    Positional arguments following q will be passed to 
+    generateClassScores.
+    
+    Args:
+
+        q (multiprocessing.Queue): A queue into which the class 
+            scores will be placed for retrieval by the calling 
+            function / object.
+
+    Returns:
+    
+        Nothing.
+    """
+
+    q.put(generateClassScores(*args))
 
 
 def generateClassScores(target_dir, model_path, show_prog=True, check_images=False):
@@ -336,7 +377,7 @@ def generateEmbeddings(target_dir, cnet_version, show_prog=True, check_images=Fa
         model_path, class_names, embed_layer_name, embed_nodes = v4_model_path, v4_class_names, "dense_1", 256
     else:
         return
-    
+
     cnet_model = tf.keras.models.load_model(model_path)
     embed_model = tf.keras.models.Model(inputs = cnet_model.input,
                                 outputs = {"class_scores": cnet_model.output,
@@ -345,10 +386,10 @@ def generateEmbeddings(target_dir, cnet_version, show_prog=True, check_images=Fa
     embed_cols = ["Node_{0:03d}".format(j) for j in range(embed_nodes)]
 
     model_output = embed_model.predict(image_batches, verbose = 1 if show_prog else 0)
-    
+
     predictions = pd.DataFrame(data=model_output["class_scores"], columns=class_names).round(decimals=5)
     predictions.insert(loc=0, column="Filename", value=image_names)
-    
+
     embeddings = pd.DataFrame(data=model_output["embeddings"], columns=embed_cols).round(decimals=5)
     embeddings.insert(loc=0, column="Filename", value=image_names)
 
@@ -371,10 +412,50 @@ def logMessage(message, log_file_path=None):
     if log_file_path is not None:
         with open(log_file_path, 'a') as log_file:
             log_file.write('\n' + message)
-            
+
     print(message)
-    
+
     return
+
+
+def blockMessage(message, pad_char='#', width=80):
+    """Print a message with borders and padding for emphasis.
+
+    Args:
+
+        message (str): Message to be printed emphatically.
+
+        pad_char (char): Character to be used to pad the message.
+
+        width (int): Width of the printed message.
+
+        print (bool): Whether to print the formatted message in 
+            addition to returning it.
+
+    Returns:
+
+        str: The formatted message.
+    """
+
+    msg = '  ' + message + '  '
+    msg_len = len(msg)
+    if msg_len % 2 > 0:
+        msg = msg + ' '
+        msg_len = msg_len + 1
+
+    pad_len = (width - msg_len) // 2
+    pad = pad_char * pad_len
+
+    p1 = "\n" + pad_char * width
+    if msg_len > width:
+        p2 = msg
+    else:
+        p2 = pad + msg + pad
+    p3 = pad_char * width + "\n"
+
+    formatted_message = '\n'.join([p1, p2, p3])
+
+    return formatted_message
 
 
 def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, output_file=None, log_to_file=False, show_prog=True, cleanup=False, check_images=True):
@@ -412,9 +493,9 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
             for each class -OR- a string containing class codes or
             groups of class codes followed by the score threshold to be
             used for each class or group.
-        
+
         output_file (str): Name of the review file to be generated.
-        
+
         log_to_file (bool): Whether to copy console messages to a log 
             file (does not include progress bars).
 
@@ -423,7 +504,7 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
 
         cleanup (bool): Whether to delete spectrograms and temporary 
             folders when processing is complete.
-            
+
         check_images (bool): Whether to verify that all spectrogram 
             images can be loaded before attempting to generate class 
             scores. Skipping this step will save a bit of time but the
@@ -510,23 +591,29 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
     
     ### Generate class scores for each image ###
     if mode in ["process", "predict"]:
-        
+
         predict_start = dt.datetime.now()
         if mode == "predict":
             logMessage("\nGenerating class scores using PNW-Cnet {0} starting {1}...\n".format(cnet_version, predict_start.strftime(time_fmt)), proc_log_file)
         else:
             logMessage("\nGenerating class scores using PNW-Cnet {0}...\n".format(cnet_version), proc_log_file)
-        
+
         if not check_images:
             logMessage("`check_images` parameter is set to False.", proc_log_file)
             logMessage("Blithely assuming that all images will load correctly...\n", proc_log_file)
-        
+
         model_path = v4_model_path if cnet_version == "v4" else v5_model_path
         
-        class_scores = generateClassScores(image_dir, model_path, show_prog, check_images)
+        q = mp.Queue()
+        p = mp.Process(target=_predictInProcess, args=(q, image_dir, model_path, show_prog, check_images))
+        p.start()
+        class_scores = q.get()
+        p.join()
         
+        # class_scores = generateClassScores(image_dir, model_path, show_prog, check_images)
+
         class_scores.to_csv(class_score_file, index = False)
-        
+
         predict_end = dt.datetime.now()
         logMessage("\nFinished {0}.".format(predict_end.strftime(time_fmt)), proc_log_file)
         output_files.append(class_score_file)
@@ -580,6 +667,202 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
     return
 
 
+def batchProcess(target_dirs, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, log_to_file=False, show_prog=False, cleanup=False, check_images=True, combine_output=False):
+    """Process several folders in sequence using the same parameters.
+
+    Essentially acts as a wrapper around processFolder with some basic
+    exception handling. Available arguments are mostly the same as for
+    processFolder.
+
+    Args:
+
+        target_dirs (list): List of paths to folders containing data to
+            be processed.
+
+        cnet_version (str): Which version of the PNW-Cnet model to use
+            when generating class scores ("v4" or "v5").
+
+        spectro_dir (str): Path to the folder where spectrograms should
+            be stored.
+
+        n_workers (int): How many worker processes to use when 
+            generating spectrograms.
+
+        review_settings (str): Path to a CSV file with one column 
+            "Class" listing classes to include in the review file and
+            one column "Threshold" listing the score threshold to use 
+            for each class -OR- a string containing class codes or
+            groups of class codes followed by the score threshold to be
+            used for each class or group.
+
+        log_to_file (bool): Whether to copy console messages to a log 
+            file (does not include progress bars).
+
+        show_prog (bool): Whether to show progress bars when generating
+            spectrograms and classifying images with PNW-Cnet.
+
+        cleanup (bool): Whether to delete spectrograms and temporary 
+            folders when processing is complete.
+
+        check_images (bool): Whether to verify that all spectrogram 
+            images can be loaded before attempting to generate class 
+            scores. Skipping this step will save a bit of time but the
+            program will crash if it encounters an unloadable image.
+
+        combine_output (bool): Whether to create a set of combined 
+            output files from the output files of the individual 
+            folders that were processed.
+
+    Returns:
+
+        Nothing.
+    """
+
+    print("\nThe following directories will be processed: ")
+    print('\n'.join(target_dirs))
+
+    n_dirs = len(target_dirs)
+
+    for i in range(n_dirs):
+        dir_i = target_dirs[i]
+
+        print(blockMessage("Processing {0} ({1} of {2})...".format(dir_i, i+1, n_dirs)))
+
+        try:
+            processFolder(
+                "process",
+                dir_i,
+                cnet_version, 
+                spectro_dir, 
+                n_workers, 
+                review_settings, 
+                log_to_file=log_to_file, 
+                show_prog=show_prog, 
+                cleanup=cleanup, 
+                check_images=check_images)
+        except:
+            print("\nEncountered an error while processing {0}. Proceeding to next folder.\n".format(dir_i))
+
+    print(blockMessage("Batch processing complete."))
+
+    if combine_output:
+        combineOutputFiles(target_dirs, cnet_version, review_settings)
+
+    return
+
+
+def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
+    """Consolidate output files generated from a `batch_process` run.
+
+    The combined output files will be saved in the lowest-level 
+    directories containing all the target directories, i.e. the folder
+    corresponding to the longest common path. If that directory is not 
+    writable, files will be saved in the first valid directory in the
+    list of target directories with the prefix "Combined".
+
+    Args:
+
+        target_dirs (list): List of paths to folders that were 
+            processed.
+
+        cnet_version (str): Version of PNW-Cnet that was used to 
+            generate class scores; either "v5" (default) or "v4".
+
+        review_settings (str): Path to a CSV file with one column 
+            "Class" listing classes to include in the review file and
+            one column "Threshold" listing the score threshold to use 
+            for each class -OR- a string containing class codes or
+            groups of class codes followed by the score threshold to be
+            used for each class or group.
+
+    Returns:
+
+        Nothing.
+    """
+
+    print("\nCombining output from the following target directories: ")
+    print('\n'.join(target_dirs))
+
+    dir_paths = [Path(dir) for dir in target_dirs]
+    top_dir = Path(*os.path.commonprefix([i.parts for i in dir_paths]))
+    top_name = top_dir.parts[-1]
+
+    print("\nCombined output files will be written to {0}.".format(top_dir))
+
+    n_dirs = len(target_dirs)
+    pred_lines, log_lines = [], []
+
+    for i in range(n_dirs):
+        startline = min(i, 1)
+
+        dir_i = dir_paths[i]
+        name_i = dir_i.parts[-1]
+
+        inv_path = Path(dir_i, "{0}_wav_inventory.csv".format(name_i, cnet_version))
+        try:
+            new_inv = pd.read_csv(inv_path)
+            inv_dirs = new_inv["Folder"].fillna('')
+            inv_paths = [Path(dir_i, j) for j in inv_dirs]
+            new_inv_paths = [k.relative_to(top_dir) for k in inv_paths]
+            new_inv["Folder"] = new_inv_paths
+            inv_df = new_inv if i == 0 else pd.concat([inv_df, new_inv], axis=0)
+        except:
+            pass
+
+        pred_path = Path(dir_i, "{0}_{1}_class_scores.csv".format(name_i, cnet_version))
+        try:
+            with open(pred_path) as pred_file:
+                pred_lines = pred_lines + pred_file.readlines()[startline:]
+        except:
+            pass
+
+        log_paths = list(dir_i.glob("{0}_processing_log*".format(name_i)))
+        if len(log_paths) == 0:
+            log_path = ''
+        else:
+            if len(log_paths) == 1:
+                log_path = log_paths[0]
+            else:
+                log_path = sorted(log_paths, key=lambda x: os.path.getmtime(x))[0]
+            with open(log_path) as log_file:
+                log_lines.append({"dir": dir_i, "log_file": log_path, "log_lines": log_file.readlines()})
+
+    pred_out_path = Path(top_dir, "{0}_{1}_class_scores.csv".format(top_name, cnet_version))
+    with open(pred_out_path, 'w') as pred_out_file:
+        pred_out_file.writelines(pred_lines)
+
+    inv_out_path = Path(top_dir, "{0}_wav_inventory.csv".format(top_name))
+    inv_df.to_csv(inv_out_path, index=False)
+
+    pred_df = pycnet.review.readPredFile(pred_out_path)
+
+    summary_df = pycnet.review.summarizeDetections(pred_df)
+    summary_path = Path(top_dir, "{0}_{1}_detection_summary.csv".format(top_name, cnet_version))
+    summary_df.to_csv(summary_path, index=False)
+
+    review_df = pycnet.review.makeKscopeReviewTable(pred_df, top_dir, cnet_version, review_settings)
+    review_path = Path(top_dir, "{0}_{1}_review_kscope.csv".format(top_name, cnet_version))
+    review_df.to_csv(review_path, index=False)
+
+    n_log_files = len(log_lines)
+    if n_log_files > 0:
+        log_timestamp_1 = log_lines[0]["log_file"].parts[-1][-15:]
+        log_out_path = Path(top_dir, "{0}_batch_processing_log_{1}".format(top_name, log_timestamp_1))
+        with open(log_out_path, 'w') as log_out_file:
+            for j in range(n_log_files):
+                jvals = log_lines[j]
+                log_out_file.write(blockMessage("Processing {0} ({1} of {2})...".format(jvals["dir"], j+1, n_log_files)))
+                log_out_file.write(''.join(jvals["log_lines"]))
+            log_out_file.write(blockMessage("Batch processing complete."))
+
+    total_data_h = sum(inv_df["Duration"]) / 3600.
+
+    print("\nFinished combining output files.\n")
+    print("Total data processed: {0:.01f} h\n".format(total_data_h))
+
+    return
+
+
 def parsePycnetArgs():
     """Define command-line options for the 'pycnet' console script.
 
@@ -598,10 +881,10 @@ def parsePycnetArgs():
     parser = argparse.ArgumentParser(description="Perform one or more processing operations on a folder.")
 
     parser.add_argument("mode", metavar="MODE", type=str,
-        choices=["rename", "inventory", "spectro", "predict", "review", "process", "cleanup", "test"], 
-        help="Operation to be performed. Options: 'inventory' (default), 'rename', 'spectro', 'predict', 'review', 'process', 'cleanup'.", default="inventory")
+        choices=["rename", "inventory", "spectro", "predict", "review", "process", "cleanup", "batch_process", "combine"], 
+        help="Operation to be performed. Options: 'inventory' (default), 'rename', 'spectro', 'predict', 'review', 'process', 'batch_process', 'combine', 'cleanup'.", default="inventory")
 
-    parser.add_argument("target_dir", metavar="TARGET_DIR", type=str, help="Path to the directory containing .wav files to be processed.")
+    parser.add_argument("target_dir", metavar="TARGET_DIR", type=str, help="Path to the directory containing .wav files to be processed. If MODE is 'batch_process', provide the path to a text file listing folders to be processed separated by newlines.")
 
     parser.add_argument("-c", dest="cnet_version", type=str, choices=["v4", "v5"], default="v5",
         help="Version of PNW-Cnet to use when generating class scores. Options: 'v5' (default) or 'v4'.")
@@ -629,6 +912,9 @@ def parsePycnetArgs():
         
     parser.add_argument("-k", dest="skip_image_check", action="store_true",
         help="Do not check whether all images can be loaded before generating class scores.")
+        
+    parser.add_argument("-m", dest="combine_output", action="store_true", 
+        help="(batch_process only) Combine class scores, .wav inventory, detection summary and review files once batch processing is complete.")
 
     args = parser.parse_args()
     

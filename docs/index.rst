@@ -152,7 +152,7 @@ Required arguments
 Mode
 ++++
 
-When you run the ``pycnet`` command, you almost always need to supply a mode and a target directory, in that order. Again, the **mode** is a single lowercase word that indicates what you want pycnet to do. 
+When you run the ``pycnet`` command, you almost always need to supply a mode and a target directory, in that order. Again, the **mode** is typically a single lowercase word that indicates what you want pycnet to do. 
 
 Here is the full list of acceptable modes and what each of them does:
 
@@ -239,7 +239,7 @@ This tells the interpreter to treat the text within the quotes as a single value
 Optional arguments
 ------------------
 
-In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, some flags (``-a``, ``-l``, ``-k``, and ``-q``) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
+In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, some flags (``-a``, ``-l``, ``-k``, ``m``, and ``-q``) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
 
 The available optional arguments are as follows:
 

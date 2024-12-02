@@ -159,6 +159,9 @@ Here is the full list of acceptable modes and what each of them does:
 	``process`` 
 		Inventory the audio files; generate spectrograms; generate class scores; summarize apparent detections; and generate the review file. This is intended to be the "bread-and-butter" option for normal data processing.
 
+	``batch_process``
+		Same as ``process``, but process a list of directories instead of just one. The paths to the target directories are read from a text file. Target directories will be processed in sequence using the same set of options.
+
 	``spectro`` 
 		Inventory the audio files (if necessary) and generate the spectrograms.
 
@@ -174,13 +177,16 @@ Here is the full list of acceptable modes and what each of them does:
 	``rename`` 
 		Standardize filenames to the format expected by the program, consisting of a prefix (either supplied by the user or based on the directory structure) and the date and time when the recording began.
 
-	``cleanup`` 
-		Recursively delete the spectrograms and the temporary folder in which they were generated. (This can also be done automatically in some other modes by including the **-a** flag; see below.)
+	``combine``
+		Combine processing output files (class score files, .wav file inventory files, detection summary files, review files, and processing log files) from several target directories. (This will be done automatically in ``batch_process`` mode if you include the ``-m`` flag; see below.)
+
+	``cleanup``
+		Recursively delete the spectrograms and the temporary folder in which they were generated. (This will be done automatically in some other modes if you include the ``-a`` flag; see below.)
 
 Target directory
 ++++++++++++++++
 
-The **target directory** can be any folder on your computer, although if the folder doesn't contain any audio data, then pycnet will not be able to do much with it. 
+The **target directory** can be any folder on your computer, although if the folder doesn't contain any audio data, then pycnet will not be able to do much with it.
 
 You need to supply the target directory in the form of an `absolute path`. On a Windows machine this means it needs to include a drive letter and any intermediate directories in addition to the name of the folder itself. If you are viewing the folder in File Explorer, you can click on the address bar near the top of the window to highlight and copy the full path. You can also hold ``Shift`` and right-click on a folder in the File Explorer main pane and select ``Copy as path`` to copy the absolute path to the item.
 
@@ -202,14 +208,25 @@ pycnet will search the target directory for audio files with a .wav extension. T
 						...
 			...
 
+If you are running pycnet in ``batch_process`` or ``combine`` mode, then instead of a path to a directory, you should provide the full path to a text file listing the paths of directories to be processed, one on each line. pycnet will process these directories in sequence, just as if you had manually run ``pycnet process`` on each of them. Note that regardless of the file extension, the *contents* of the file should be plain text. (It might be convenient to use Excel or a similar program to create and edit the file, but if you do, make sure to save it as a CSV file rather than as an Excel workbook.)
+
 .. Important::
-	pycnet expects the names of your .wav files to adhere to a specific format, which includes a study area or project code, field site ID, recording station ID, date and time. To wit::
+	It is worth thinking carefully about how to organize and name your files, ideally before you ever deploy your ARUs. As outlined above, we recommend structuring your folders in a way that reflects your sampling scheme. Additionally, we recommend giving your audio files informative names so that the origin of any given file can be readily determined from its name. For instance, the filename format used by the spotted owl monitoring program includes a study area code, field site ID, recording station ID, date, and time, in that order, so our filenames look like this::
 
-		[Study Area]_[Site ID]-[Station ID]_YYYYMMDD_HHMMSS.wav
+		COA_23459-A_20230608_121502.wav
 
-	This format means that the name of each .wav file includes information on where and when the recording was made, ordered from most general to most specific. For instance, if we see a file named ``COA_23459-A_20230608_121502.wav``, then we know that it was recorded in the Oregon Coast Range (COA) study area, at site 23459, recording station A, and that the recording began on Jun 8, 2023, starting at 12:15:02 PM.
+	Looking at the filename above, we know that this file was recorded in the Oregon Coast Range (COA) study area, at site 23459, recording station A, and that the recording began on Jun 8, 2023, starting at 12:15:02 PM. Conceptually, the name of each .wav file includes information on where and when the recording was made, ordered from most general to most specific, which is a useful property.
 	
-	**If your filenames do not adhere to this format, we cannot guarantee that all functions will work correctly.**
+	**As of version 0.5.7,** pycnet no longer assumes that your filenames adhere to this specific format. pycnet now expects filenames to consist of a prefix and a timestamp. The timestamp **must** be in ``YYYYMMDD_HHMMSS`` format (e.g. ``20241202_090530``), must be the final portion of the filename (i.e. it should be followed immediately by the .wav file extension), and must be preceded by an underscore (``_``). However, the prefix can follow any format you like. The following examples would all be considered valid filenames:
+	::
+
+		S4A10056_20230531_140000.wav 
+
+		ARU_73_20230321_182400.wav
+
+		A-B-10.3_20240719_083157.wav
+
+	We still recommend using a naming convention similar to the one described above, as long as it is appropriate for your sampling design, but the program is now less likely to crash if you don't. The practical significance of the prefix structure is discussed more in `Appendix A. Output files`_ below.
 
 
 In addition to the above advice on filename formatting, we strongly recommend that you avoid using spaces in the names of your files and folders, as this can introduce various unintended behavior when processing data; underscores are a safe alternative. If you want to process data in a location whose path includes spaces, then you will need to enclose the target directory argument in double quotes when calling pycnet, e.g.
@@ -259,7 +276,11 @@ The available optional arguments are as follows:
  ``-k`` (sKip image check)
 	Instructs the program not to check whether spectrogram image files can be loaded before attempting to generate class scores. Skipping this step saves time, especially with larger datasets, but if the model encounters an image file that can't be loaded, the program will crash without saving any class scores to file. Unloadable image files can occur when the audio files are incomplete or corrupted. Of course, if a crash does occur, you can always run the operation again with this option omitted; the only real cost is time. This flag does not need to be paired with a value.
 
-Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the processing mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.
+ ``-m`` (coMbine output files)
+	(Only used in ``batch_process`` mode.) When this flag is set, the output files (class score files, .wav file inventory files, detection summary files, and review files) generated for each of the target directories will be combined into one once all target directories have been processed. This is intended for use when e.g. the target directories represent different recording stations within the same field site. This flag does not need to be paired with a value.
+
+
+Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.
 
 
 More examples
@@ -369,6 +390,9 @@ CLE_36702_v5_detection_summary.csv
 		[ACCO1, ACGE1, ..., ZOLE1]
 			Number of apparent detections (i.e., the number of Clips with score >= Threshold) for each of the 135 PNW-Cnet v5 target classes for this combination of Area, Site, Stn, Date, and Threshold. If the class scores were generated using PNW-Cnet v4 then there will instead be 51 columns [AEAC, BRCA, ..., ZEMA], but the structure will be the same.
 
+The contents of the first three fields will depend on how your .wav filenames are formatted. When constructing the detection summary data frame, pycnet will separate each .wav filename into a timestamp and a prefix. The timestamp must be in YYYYMMDD_HHMMSS format, must be the final component of the filename (i.e. it should be followed immediately by the .wav file extension), and must be separated from the prefix by an underscore (``_``). The prefix includes everything before the timestamp. pycnet will then split the prefix into a set of components delimited by dashes, underscores, and/or periods (``-``, ``_``, and ``.``). If the prefix has three components, then they will be assigned to the Area, Site, and Stn fields in the detection summary table. If the prefix does not have three components, then the entire prefix will be assigned to the Stn field, and the Area and Site fields will be left blank.
+
+
 CLE_36702_v5_review_kscope.csv
 	Lists apparent detections for classes included in the review settings dictionary. Fields in this file are as follows:
 		
@@ -388,7 +412,7 @@ CLE_36702_v5_review_kscope.csv
 			Location of the clip within IN_FILE in seconds.
 
 		DURATION
-			Length of the clip in seconds.
+			Length of the clip in seconds. Usually 12 but may be less for clips found at the end of a file.
 
 		DATE
 			Calendar date at the beginning of the clip. May differ from the timestamp in the IN_FILE filename if that recording went past midnight.

@@ -227,6 +227,8 @@ If you are running pycnet in ``batch_process`` or ``combine`` mode, then instead
 		A-B-10.3_20240719_083157.wav
 
 	We still recommend using a naming convention similar to the one described above, as long as it is appropriate for your sampling design, but the program is now less likely to crash if you don't. The practical significance of the prefix structure is discussed more in `Appendix A. Output files`_ below.
+	
+	Last but certainly not least, **please make sure that the name of each .wav file is unique.** Ideally your filenames should be unique across your entire study, but at the very least they should be unique within each dataset that you process. Datasets containing non-unique filenames may result in misleading output and flawed inferences!
 
 
 In addition to the above advice on filename formatting, we strongly recommend that you avoid using spaces in the names of your files and folders, as this can introduce various unintended behavior when processing data; underscores are a safe alternative. If you want to process data in a location whose path includes spaces, then you will need to enclose the target directory argument in double quotes when calling pycnet, e.g.
@@ -239,7 +241,7 @@ This tells the interpreter to treat the text within the quotes as a single value
 Optional arguments
 ------------------
 
-In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, some flags (``-a``, ``-l``, ``-k``, ``m``, and ``-q``) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
+In addition to the processing mode and the target directory, which are required, you can specify a number of other, optional arguments, which can be used in any order. In most cases you use these by including a flag followed by a value, e.g. ``-c v4``, somewhat like assigning a value to a variable. However, some flags (``-a``, ``-l``, ``-k``, ``-m``, and ``-q``) can be used without specifying an additional value. In these cases, the flag itself acts as a switch that turns specific behaviors on or off.
 
 The available optional arguments are as follows:
 

@@ -83,6 +83,7 @@ def expandDetSummaryDF(df):
         combinations of Area, Site, Stn, and Date for all thresholds,
         with missing values filled in with 0s.
     """
+    df.fillna("", inplace=True)
 
     real_dates = expandDates(df)
     str_dates = [x.strftime("%Y-%m-%d") for x in real_dates]
@@ -117,7 +118,6 @@ def expandDetSummaryDF(df):
     expanded_df = pd.merge(left=fill_df, right=df, how="left", on=fill_cols).fillna(value=0)
 
     return expanded_df
-
 
 
 def formatDateTickLabels(df, interval=7, fill_gaps=True):
@@ -176,8 +176,6 @@ def formatPlotData(df, criteria):
         threshold specified for each class.
     """
 
-
-
     id_cols = ["Area", "Site", "Stn", "Date", "Rec_Day", "Rec_Week", 
                "Clips", "Effort", "Threshold"]
 
@@ -231,6 +229,14 @@ def plotDetections(df, criteria, timescale="weekly", show_plot=True, dest_file=N
     time_var = "Rec_Week" if timescale == "weekly" else "Rec_Day"
     plot_data = formatPlotData(df, criteria)
     
+    n_stns = len(list(set(plot_data["Stn"])))
+    if n_stns == 1:
+        wrap_val = 1
+    elif n_stns > 8:
+        wrap_val = 4
+    else:
+        wrap_val = 2
+    
     n_classes = len(criteria)
     pal = sns.color_palette("Dark2", n_classes)
     
@@ -244,7 +250,7 @@ def plotDetections(df, criteria, timescale="weekly", show_plot=True, dest_file=N
         estimator=sum,
         errorbar=None,
         col="Stn",
-        col_wrap=2,
+        col_wrap=wrap_val,
         palette=pal)
 
     fill_tick_gaps = timescale=="daily"

@@ -22,6 +22,7 @@ Classes:
 import multiprocessing as mp
 import os
 import pycnet
+import signal
 import sys
 from tensorflow.keras.preprocessing.image import load_img
 
@@ -93,7 +94,7 @@ def checkImages(top_dir, n_workers=0, verbose=True):
         list: A sorted list of paths to image files that could not be 
         loaded for any reason.
     """
-    
+
     if n_workers == 0:
         n_workers = mp.cpu_count()
     else:
@@ -103,20 +104,26 @@ def checkImages(top_dir, n_workers=0, verbose=True):
     if verbose:
         print("\nFound {0} PNG files under {1}.\n".format(len(pngs), top_dir))
         print("Checking images... ", end='')
-    
+
     img_queue, bad_img_queue = mp.JoinableQueue(), mp.Queue()
     for i in pngs:
         img_queue.put(i)
-        
+
+    worker_pids = []
+
     for j in range(n_workers):
         worker = ImageChecker(img_queue, bad_img_queue)
         worker.daemon = True
         worker.start()
-        
+        worker_pids.append(worker.pid)
+
     img_queue.join()
-    
+
+    for k in worker_pids:
+        os.kill(int(k), signal.SIGTERM)
+
     print("done.")
-    
+
     n_bad_imgs = bad_img_queue.qsize()
     bad_imgs = []
 
@@ -131,10 +138,10 @@ def checkImages(top_dir, n_workers=0, verbose=True):
     else:
         if verbose:
             print("\nAll images loaded successfully. No errors detected.\n")
-    
+
     bad_imgs.sort()
     good_imgs = [x for x in pngs if not x in bad_imgs]
-    
+
     return {"good_images": good_imgs, "bad_images": bad_imgs}
 
 

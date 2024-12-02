@@ -107,18 +107,29 @@ def getClipInfo(clip_name):
         dict: Dictionary of values inferred from the image filename.
     """
 
-    clip_vals = re.split(pattern="[-._]", string=clip_name)
-    if len(clip_vals) != 8:
-        clip_dict = {"Area":"Unk", "Site":"Unk", "Stn":"Unk", "Part":"Unk"}
-        clip_dict.update({"Timestamp":datetime(2999,12,31,23,59,59)})
+    stamp_patt = re.compile("_[0-9]{8}_[0-9]{6}_part_[0-9]+\\.png")
+    part_patt = re.compile("part_[0-9]+")
+
+    try:
+        clip_stamp = stamp_patt.findall(clip_name)[0]
+        clip_prefix = clip_name.replace(clip_stamp, "")
+
+        site_vals = re.split(pattern="[-._]", string=clip_prefix)
+        if len(site_vals) == 3:
+            clip_dict = dict(zip(["Area", "Site", "Stn"], site_vals))
+        else:
+            clip_dict = {"Area": '', "Site": '', "Stn": clip_prefix}
+
+        clip_str_datetime = clip_stamp[1:16]
+        clip_dict["Timestamp"] = datetime.strptime(clip_str_datetime, "%Y%m%d_%H%M%S")
         clip_dict["Date"] = clip_dict["Timestamp"].date()
-    else:
-        val_names = ["Area", "Site", "Stn", "Part"]
-        clip_dict = dict(zip(["Area", "Site", "Stn"], clip_vals[:3]))
-        str_datetime = '_'.join(clip_vals[3:5])
-        clip_dict["Timestamp"] = datetime.strptime(str_datetime, "%Y%m%d_%H%M%S")
-        clip_dict["Date"] = clip_dict["Timestamp"].date()
-        clip_dict["Part"] = clip_vals[6]
+
+        clip_part = part_patt.findall(clip_name)[0].replace("part_", "")
+        clip_dict["Part"] = clip_part
+
+    except:
+        clip_dict = {"Area":None, "Site":None, "Stn":None, "Timestamp":None, "Date":None}
+
     return clip_dict
 
 
@@ -184,7 +195,6 @@ def buildClipDataFrame(pred_table):
     clips = pred_table["Filename"]
     clip_df = pd.DataFrame(data=[getClipInfo(clip) for clip in clips])
     clip_df["Filename"] = clips
-    # clip_df["Date"] = [stamp.date() for stamp in clip_df["Timestamp"]]
     day_1 = min(clip_df["Date"])
     clip_df["Rec_Day"] = [(date - day_1).days + 1 for date in clip_df["Date"]]
     clip_df["Rec_Week"] = [int((day - 1) / 7.) + 1 for day in clip_df["Rec_Day"]]
@@ -195,22 +205,21 @@ def getSourceFile(clip_name):
     """Return the name of the .wav file from which a clip was taken.
 
     Args:
-        
+
         clip_name (str): Filename created by concatenating the name of
             the source file, a string indicating a position within that
             file (e.g. "part_017"), and a file extension (".png").
-    
+
     Returns:
-        
+
         tuple: A tuple (source_file, str_part) containing the name of 
         the source file and the part_xxx string indicating position 
         within the source file. If the clip name is not formatted as 
         expected, the returned tuple will contain two empty strings.
     """
-    
-    clip_pattern = re.compile("[A-Z]+?_[A-Za-z0-9]+?-[A-Za-z0-9]+?_[0-9]{8}_[0-9]{6}_part_[0-9]+?\\.png")
+
     part_pattern = re.compile("part_[0-9]+")
-    if not clip_pattern.match(clip_name):
+    if not part_pattern.search(clip_name):
         return ("", "")
     else:
         base_name = os.path.splitext(clip_name)[0]
@@ -278,47 +287,12 @@ def getSourceFolders(clip_list, mode="from_source_files", top_dir="", prefix="")
             return joined_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
     
     elif mode == "from_clip_names":
-        stn_list = [prefix + re.split("[-._]", clip)[2] for clip in clip_list]
+        stn_list = [prefix + getClipInfo(clip)["Stn"] for clip in clip_list]
+        # stn_list = [prefix + re.split("[-._]", clip)[2] for clip in clip_list]
 
         source_file_df.insert(loc=0, column="FOLDER", value=stn_list)
 
         return source_file_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
-
-
-
-# def inferSourceFolders(clip_list, prefix=""):
-    # """Infer source folders from filenames for a set of clips.
-    
-    # This function is intended to provide the option of creating a
-    # review file from a set of class scores when the audio data are not
-    # present locally. Instead of checking the clips against an inventory
-    # of .wav files, it infers the name of the station folder from the
-    # structure of the clip filenames, combined with an optional prefix,
-    # e.g. "Stn_".
-    
-    # Args:
-        
-        # clip_list (list): A list of names of spectrogram image files.
-        
-        # prefix (str): String that will be prepended to the station code
-            # as inferred from the clip filenames to populate the FOLDER
-            # field.
-        
-    # Returns:
-        
-        # Pandas.DataFrame: DataFrame listing the folder inferred from
-        # the clip filenames.
-    
-    # """
-    # source_file_list, part_list = zip(*[getSourceFile(clip) for clip in clip_list])
-    # source_file_df = pd.DataFrame(data={"Filename": clip_list, "IN_FILE": source_file_list, "PART": part_list})
-
-    # stn_list = [prefix + re.split("[-._]", clip)[2] for clip in clip_list]
-
-    # source_file_df.insert(loc=0, column="FOLDER", value=stn_list)
-
-    # return source_file_df[["FOLDER", "IN_FILE", "PART", "Filename"]]
-        
 
 
 def readReviewSettings(review_settings_file):

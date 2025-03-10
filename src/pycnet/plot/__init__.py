@@ -100,6 +100,9 @@ def expandDetSummaryDF(df):
     fill_cols = ["Area", "Site", "Stn", "Date", "Rec_Day", "Rec_Week", "Threshold"]
 
     fill_df = pd.DataFrame(columns = fill_cols)
+
+    first_round = True
+
     for i in unique_areas:
         for j in unique_sites:
             for k in unique_stns:
@@ -113,7 +116,12 @@ def expandDetSummaryDF(df):
                             "Rec_Week":rec_weeks, 
                             "Threshold":t}
                     )
-                    fill_df = pd.concat([fill_df, new_rows], axis=0)
+
+                    if first_round:
+                        fill_df = new_rows
+                        first_round = False
+                    else:
+                        fill_df = pd.concat([fill_df, new_rows], axis=0)
 
     expanded_df = pd.merge(left=fill_df, right=df, how="left", on=fill_cols).fillna(value=0)
 
@@ -192,9 +200,15 @@ def formatPlotData(df, criteria):
 
     plot_data = pd.DataFrame(columns=df_long.keys())
 
+    first_round = True
+
     for c in class_codes:
         new_rows = df_long[(df_long["Class"] == c) & (df_long["Threshold"] == criteria[c])]
-        plot_data = pd.concat([plot_data, new_rows], axis=0)
+        if first_round:
+            plot_data = new_rows
+            first_round = False
+        else:
+            plot_data = pd.concat([plot_data, new_rows], axis=0)
 
     return plot_data
 

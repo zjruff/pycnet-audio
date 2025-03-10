@@ -13,7 +13,7 @@ Welcome to pycnet-audio!
 .. contents:: Contents
 
 
-**pycnet-audio** is a package that provides command-line tools and a Python API for processing bioacoustics data using the PNW-Cnet deep learning model. pycnet-audio is structured as a Python package and contains a main module called ``pycnet`` with several submodules that can be imported and used in Python code to define your own workflows for processing audio data. It also provides command-line tools in the form of console scripts which can be used as-is to execute more standardized workflows. To see the formal package documentation, check the links under Module Reference. For installation instructions, detailed usage notes and tutorials, keep reading.
+**pycnet-audio** is a software package for bioacoustics data processing using the PNW-Cnet deep learning model. pycnet-audio provides easy-to-use command-line tools for executing standard data processing workflows. As a Python package, it also provides importable modules that can be incorporated into your Python code to define your own workflows for processing audio data. To see the formal package documentation, check the links under Module Reference. For installation instructions, detailed usage notes and tutorials, keep reading.
 
 This guide generally assumes that you are running a 64-bit version of Windows. pycnet-audio is theoretically platform-agnostic, but we have not tested it extensively on GNU/Linux or MacOS systems. Language geared toward users on these platforms may be added in the future.
 
@@ -25,22 +25,20 @@ This guide generally assumes that you are running a 64-bit version of Windows. p
 
 .. admonition:: A note on naming
 
-	The name **pycnet** is a portmanteau of **Py**\thon and PNW-**Cnet**\, chosen for being short, punchy, and easy to type. The main importable module provided by this package is called pycnet, as is the main command-line tool used to process data, so we initially planned to use pycnet as the name of the distribution package as well. Tragically, this name was already taken on PyPI.org, so to avoid ambiguity, the distribution package is called pycnet-audio. Practically, this means you should use the name **pycnet-audio** when installing or updating the package using pip. For all other purposes, including running the command-line tools as well as using the functions and classes exported by the module in your own code, use **pycnet**.
+	The name **pycnet** is a portmanteau of **Py**\thon and PNW-**Cnet**\, chosen for being short, punchy, and easy to type. The main importable module provided by this package is called pycnet, as is the main command-line tool used to process data, so we initially planned to use pycnet as the name of the distribution package as well. Tragically, this name was already taken on PyPI.org, so to avoid ambiguity, the distribution package is called pycnet-audio. Practically, this just means you'll need to use the name **pycnet-audio** when installing or updating the package using pip. For all other purposes, including running the command-line tools as well as using the functions and classes exported by the module in your own code, use **pycnet**.
 
 
 Installation
 ============
 
-pycnet-audio can be installed from the `Python Package Index <https://pypi.org/>`_ using the ``pip`` tool, which comes bundled with all modern Python distributions. You will need Python version 3.8, and to use the program in full, you will also need to install `SoX <https://sourceforge.net/projects/sox/>`_. To simplify setup and dependency management, we recommend using a dedicated Conda environment. Conda environments are essentially self-contained Python installations that can be created, configured, and deleted without affecting the operation of other software on your system. They can also be readily "cloned," which makes it straightforward to set up identical environments on multiple machines. 
+pycnet-audio can be installed from the `Python Package Index <https://pypi.org/>`_ using the ``pip`` tool, which comes bundled with all modern Python distributions. You will need a version of Python between 3.8 and 3.11, and to use the program in full, you will also need to install `SoX <https://sourceforge.net/projects/sox/>`_. To simplify setup and dependency management, we recommend using a dedicated Conda environment. Conda has many uses, but for our purposes, you can think of a Conda environment as a self-contained Python installation that can be created, configured, and deleted without affecting the operation of other software on your system. Conda environments can also be readily "cloned," which makes it straightforward to set up identical environments on multiple machines.
 
-To set up a Conda environment, you will need to install either Anaconda or Miniconda. We recommend using Miniconda, which is designed to be lightweight and modular, whereas Anaconda is a fairly heavy-duty suite containing a variety of scientific software, most of which is not relevant for our purposes. 
-
-`Install Miniconda <https://docs.anaconda.com/free/miniconda/>`_, then use the Anaconda Prompt program to run 
+To set up a Conda environment, you will need to install either Anaconda or Miniconda. We recommend using Miniconda, which is designed to be lightweight and modular, whereas Anaconda is a fairly heavy-duty suite containing a variety of scientific software, most of which is not relevant for our purposes. So, the first step is to `install Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_. On a Windows machine, this will give you access to a command shell program called Anaconda Prompt, which you can then use to install everything else. Open Anaconda Prompt and run 
 ::
 
-	conda create -n pycnet -c conda-forge sox python=3.8
+	conda create -n pycnet -c conda-forge sox python=3.11
 
-Hit Enter when you are prompted to proceed. This will create a new conda environment called pycnet with Python 3.8 installed and will install SoX to it from the conda-forge repository. (The `conda-forge repository <https://conda-forge.org/>`_ is maintained by the open-source community and, unlike the repositories maintained by Anaconda, Inc., it does not require a license to use.)
+Hit Enter when you are prompted to proceed. This will create a new conda environment called pycnet with Python 3.11 installed and will install SoX to it from the conda-forge repository. (The `conda-forge repository <https://conda-forge.org/>`_ is maintained by the open-source community and, unlike the repositories maintained by Anaconda, Inc., it does not require a license to use.)
 
 If all goes well, you should see a message that looks like this:
 ::
@@ -64,7 +62,7 @@ Note the ``(base)`` at the beginning of the prompt on the last line. This indica
 
 	conda activate pycnet
 
-The ``(base)`` indicator in the command prompt will change to ``(pycnet)``, indicating that the pycnet environment is now active and we can install things to it. Now run 
+(Note that we omit the dollar sign - the ``$`` in the conda output above is meant as a stand-in for the prompt itself and is not part of the actual command.) The ``(base)`` indicator in the command prompt will change to ``(pycnet)``, indicating that the pycnet environment is now active and we can install things to it. Now run 
 ::
 
 	pip install pycnet-audio
@@ -175,7 +173,7 @@ Here is the full list of acceptable modes and what each of them does:
 		Inventory the audio files and write the information to a CSV file.
 
 	``rename`` 
-		Standardize filenames to the format expected by the program, consisting of a prefix (either supplied by the user or based on the directory structure) and the date and time when the recording began.
+		Standardize filenames to the format expected by the program, consisting of a prefix (either supplied by the user or based on the directory structure) and the date and time when the recording began. If the filename already contains a timestamp in YYYYMMDD_HHMMSS format, that timestamp will be retained. If not, pycnet will create a timestamp for each file based on the file's last modification time.
 
 	``combine``
 		Combine processing output files (class score files, .wav file inventory files, detection summary files, review files, and processing log files) from several target directories. (This will be done automatically in ``batch_process`` mode if you include the ``-m`` flag; see below.)
@@ -202,7 +200,7 @@ pycnet will search the target directory for audio files with a .wav extension. T
 			|_____ COA_23459-A_20230608_150002.wav
 						...
 			|_____ COA_23459-A_20230723_084102.wav
-		
+
 		|___ Stn_B
 			|_____ COA_23459-B_20230608_132709.wav
 						...
@@ -216,7 +214,7 @@ If you are running pycnet in ``batch_process`` or ``combine`` mode, then instead
 		COA_23459-A_20230608_121502.wav
 
 	Looking at the filename above, we know that this file was recorded in the Oregon Coast Range (COA) study area, at site 23459, recording station A, and that the recording began on Jun 8, 2023, starting at 12:15:02 PM. Conceptually, the name of each .wav file includes information on where and when the recording was made, ordered from most general to most specific, which is a useful property.
-	
+
 	**As of version 0.5.7,** pycnet no longer assumes that your filenames adhere to this specific format. pycnet now expects filenames to consist of a prefix and a timestamp. The timestamp **must** be in ``YYYYMMDD_HHMMSS`` format (e.g. ``20241202_090530``), must be the final portion of the filename (i.e. it should be followed immediately by the .wav file extension), and must be preceded by an underscore (``_``). However, the prefix can follow any format you like. The following examples would all be considered valid filenames:
 	::
 
@@ -227,8 +225,10 @@ If you are running pycnet in ``batch_process`` or ``combine`` mode, then instead
 		A-B-10.3_20240719_083157.wav
 
 	We still recommend using a naming convention similar to the one described above, as long as it is appropriate for your sampling design, but the program is now less likely to crash if you don't. The practical significance of the prefix structure is discussed more in `Appendix A. Output files`_ below.
-	
+
 	Last but certainly not least, **please make sure that the name of each .wav file is unique.** Ideally your filenames should be unique across your entire study, but at the very least they should be unique within each dataset that you process. Datasets containing non-unique filenames may result in misleading output and flawed inferences!
+
+	See `Appendix D. Renaming audio files`_ below for information about using pycnet to standardize your filenames. 
 
 
 In addition to the above advice on filename formatting, we strongly recommend that you avoid using spaces in the names of your files and folders, as this can introduce various unintended behavior when processing data; underscores are a safe alternative. If you want to process data in a location whose path includes spaces, then you will need to enclose the target directory argument in double quotes when calling pycnet, e.g.
@@ -264,7 +264,7 @@ The available optional arguments are as follows:
 	Specify a name to be used for the review file instead of the default name. Useful if you want to experiment with different review settings without overwriting a previously generated file.
 
  ``-p`` (Prefix)
-	Use a specific prefix when renaming files rather than generating the prefix automatically based on folder structure.
+	Use a specific prefix when renaming files. This can be a fixed string (e.g. "COA_10226-B") or it can incorporate "wildcard" characters that will take their value from specific aspects of the file's location in a directory. This is a bit involved; see `Appendix D. Renaming audio files`_ below for details on how this works.
 
  ``-q`` (Quiet mode)
 	Suppress progress bars when generating spectrograms and class scores. This flag does not need to be paired with a value.
@@ -273,7 +273,7 @@ The available optional arguments are as follows:
 	You can specify review criteria in two different ways. First, you can supply the path to a CSV file specifying criteria to use when generating the review file. The file provided must have a column called "Class" listing the codes of the classes that you want included and another column called "Threshold" listing the score threshold (a decimal value between 0 and 1) to use to define apparent detections for each class. Alternatively, you can supply a text string consisting of class codes (or groups of class codes) followed by the score threshold to use for each class or group of classes, e.g. ``"STOC_4Note 0.50 STOC_Series Strix_Whistle 0.75"`` (the string must be enclosed in quotes, since it includes spaces).
 
  ``-w`` (Worker processes)
-	Number of worker processes to use when generating spectrograms. By default, pycnet will use the number of logical CPU cores on your machine, as this is typically the fastest option. Specify a lower number if you want to reserve some CPU power for other tasks. Note that processing speed can be affected by other factors, e.g. the read and write speeds of the drives involved, so using more worker processes is not always faster.
+	Number of worker processes to use when generating spectrograms. By default, pycnet will use the number of logical CPU cores on your machine, as this is typically the fastest option. Specify a lower number if you want to reserve some CPU power for other tasks. Note that processing speed can be affected by other factors, e.g. the read and write speeds of the drives involved, so using more worker processes is not always faster. The value you provide must be a whole number and must be specified as a numeral, e.g. ``-w 8``.
 
  ``-k`` (sKip image check)
 	Instructs the program not to check whether spectrogram image files can be loaded before attempting to generate class scores. Skipping this step saves time, especially with larger datasets, but if the model encounters an image file that can't be loaded, the program will crash without saving any class scores to file. Unloadable image files can occur when the audio files are incomplete or corrupted. Of course, if a crash does occur, you can always run the operation again with this option omitted; the only real cost is time. This flag does not need to be paired with a value.
@@ -282,7 +282,7 @@ The available optional arguments are as follows:
 	(Only used in ``batch_process`` mode.) When this flag is set, the output files (class score files, .wav file inventory files, detection summary files, and review files) generated for each of the target directories will be combined into one once all target directories have been processed. This is intended for use when e.g. the target directories represent different recording stations within the same field site. This flag does not need to be paired with a value.
 
 
-Note that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used, pycnet will typically override your choice and use some default value instead.
+It is worth noting that most of these options only make sense to use in certain modes. For instance, there is no reason to specify ``-c v4`` when running ``pycnet spectro`` because the PNW-Cnet model is not involved in generating spectrograms. Additionally, some options have a limited range of useful values. For instance, the ``-w`` flag can only usefully be set to a whole number between 1 and the number of logical cores in your machine's CPU. Generally, if you provide an option that is irrelevant for the mode you've chosen, it will be silently ignored. If the option is relevant but the value you provided cannot be used (e.g. ``-w twelve``), pycnet will typically override your choice and use some default value instead.
 
 
 More examples
@@ -450,6 +450,23 @@ CLE_36702_v5_review_kscope.csv
 			Column to hold species IDs and other tags added manually in Kaleidoscope. This field will always be blank when the review file is created. If you plan to tag the review file manually, we recommend saving the edited version under a different filename (e.g. ``CLE_36702_review_kscope_TAGGED.csv``) to avoid the possibility of accidentally overwriting the tags you have applied.
 
 
+Other processing modes may produce different output files. Most notably, running ``pycnet rename`` will produce a log file called e.g. ``CLE_36702_rename_log.csv``, listing each .wav file in the target directory and recording any changes to the filenames. This file contains a row for each file and contains the following fields:
+
+		Folder
+			Full path to the folder containing each file.
+
+		Old_Name
+			Name of the file prior to the renaming operation.
+
+		New_Name
+			Name of the file following the renaming operation.
+
+		Changed
+			"Y" if New_Name is different from Old_Name, "N" if they are the same.
+
+If there is already a file called ``[Target dir]_rename_log.csv`` in the target directory, ``pycnet rename`` will run in "undo mode," changing the name of each file from New_Name back to Old_Name, and will then delete Rename_Log file. See `Appendix D. Renaming audio files`_ for more details.
+
+
 Appendix B. PNW-Cnet target classes
 ===================================
 
@@ -484,3 +501,65 @@ By default, the plot will pop up in a MatPlotLib viewer window, from which you c
 	plot_dets F:\COA_23459\COA_23459_v5_detection_summary.csv "HYPI1 COAU1 0.95" -n -f test_plot.png
 
 The plotting functionality is fairly basic at the moment but will be expanded in future versions. Watch this space!
+
+
+Appendix D. Renaming audio files
+================================
+
+When you run ``pycnet rename``, pycnet will search the target directory you specify for files with a .wav extension and will attempt to standardize their filenames. There are a couple of different ways to go about this, outlined below.
+
+Let's say you have just retrieved audio data from a site with several recording stations. The site is called ``COA_23459`` and it has recording stations that you encode as ``Stn_A``, ``Stn_B``, etc. To save time, you programmed the ARUs to apply a simple placeholder prefix, ``COA``. You have transferred the audio files to a hard drive with a nested directory structure that looks something like this:
+::
+
+	F:/
+	|__ COA_23459
+		|___ Stn_A
+			|_____ COA_20230608_121502.wav
+			|_____ COA_20230608_130002.wav
+			|_____ COA_20230608_140002.wav
+			|_____ COA_20230608_150002.wav
+						...
+			|_____ COA_20230723_084102.wav
+
+		|___ Stn_B
+			|_____ COA_20230608_132709.wav
+			|_____ COA_20230608_140002.wav
+						...
+			...
+
+
+If you run ``pycnet rename F:\COA_23459``, pycnet will make a list of files with a .wav extension in the ``F:\COA_23459`` directory and its subfolders. For each .wav file, it will construct a new filename, which has two parts, a prefix and a timestamp.
+
+pycnet will check to see if each file already has a timestamp in the expected format, which is ``YYYYMMDD_HHMMSS`` (i.e., a date in year-month-date format and a time in hour-minute-second format, joined with an underscore). If the file already has a timestamp in this format, that timestamp will be retained as-is. If not, pycnet will create a new timestamp using the file's last modification time. **In most cases the modification time will be equivalent to the time of recording, but this will not always be the case.** 
+
+.. Important::
+	pycnet gets each file's modification time from your computer's operating system, which includes a time zone. If your computer is on a different time zone from the one where the ARU was programmed, the timestamp that pycnet generates may be off. Daylight saving time is also a potential complication. In the future we may add an option to explicitly adjust the timestamp forward or backward to account for these differences, but for now, use caution and always check the log file!
+
+Separately, pycnet will generate a prefix for each file. By default, this prefix will be based on the file's location within the directory structure. Specifically, it will be generated from the file's parent folder and that folder's parent folder. In the case of file ``COA_20230608_121502.wav`` above, the parent folder is called ``Stn_A`` and that folder's parent folder (the file's "grandparent folder") is called ``COA_23459``. The prefix that pycnet will generate for this file is ``COA_23459-A``. Note that, by default, pycnet will split the name of the parent folder into components separated by underscores and will use only the last component rather than the whole thing, i.e., ``A`` instead of ``Stn_A``. (This is a quirk of the naming conventions used by the spotted owl monitoring program. We regret any inconvenience.) The file already has a timestamp in the expected format, so pycnet will leave it alone, and the full filename will be ``COA_23459-A_20230608_121502.wav``. pycnet will always separate the prefix from the timestamp with an underscore.
+
+You can specify a prefix to use when renaming files using the ``-p`` option followed by the prefix to be used. The prefix can be fixed if you want to specify the exact prefix to be used, e.g. ``"23459-A"``, or it can incorporate one or more "wildcards" that pycnet will automatically replace with different components of the file's path. Each wildcard consists of a percent sign (``%``) followed by a single letter. There are currently four acceptable wildcards:
+
+	%p
+		The name of the file's parent folder. For file ``COA_20230608_121502.wav`` above, this would be ``Stn_A``.
+
+	%c
+		The last part of the file's parent folder name split by underscores. For file ``COA_20230608_121502.wav``, whose parent folder is ``Stn_A``, this would be ``A``. Note that if the parent folder name does not contain any underscores, %p and %c both resolve to the full name of the parent folder.
+
+	%g
+		The name of the file's "grandparent folder," i.e., the name of the parent folder of the file's parent folder. For file ``COA_20230608_121502.wav``, this would be ``COA_23459``.
+
+	%h
+		The last part of the file's grandparent folder name split by underscores. For file ``COA_20230608_121502.wav``, whose parent folder is ``COA_23459``, this would be ``23459``. Again, if the grandparent folder name does not contain any underscores, %g and %h are equivalent and will both resolve to the full name of the folder.
+
+
+As you may have realized, if you run ``pycnet rename [target dir]`` with no additional arguments, the resulting behavior is equivalent to running ``pycnet rename [target dir] -p "%g-%c"``, i.e., the prefix includes the full name of the grandparent folder and the last component of the station folder name, joined with a dash. Your prefix can combine wildcards with fixed text (including punctuation). For instance, if you want your filenames to be a bit more human-readable, you could run e.g. ``pycnet rename [target dir] -p "Site_%h_Station_%c"``; this would result in a name like ``Site_23459_Station_A_20230608_121502.wav``. As of pycnet-audio version 0.5.7, pycnet will happily process files with a wide variety of prefixes, as long as the timestamp is in the expected format.
+
+.. Important::
+	Renaming files en masse is risky territory, and it's possible to lose a lot of data very quickly if you aren't careful. pycnet has a couple of built-in safeguards to make this less likely when using the renaming function.
+
+	First, if you attempt a renaming operation that would result in two or more files having the same name, even if they are in different folders, pycnet will display a warning message and abort the operation, and no renaming will take place. For example, if you tried to run ``pycnet rename F:\COA_23459 -p "COA_23459"`` on the folder above, it would not work because both the ``Stn_A`` and ``Stn_B`` subfolders contain files with the timestamp ``20230608_140002``; applying the same prefix to files in both folders would produce two files with the same name. This is partly a simple check to prevent errors, and partly a statement of values. The name of each of your files should be unique within your entire study, but at a bare minimum, filenames should be unique within each set of data to be processed. **Using duplicate filenames is a bad practice that will likely produce negative downstream consequences. Don't do it!**
+
+	Second, when you run ``pycnet rename``, assuming the renaming is successful, pycnet will produce a text log file called ``[Target dir]_rename_log.csv``. This file has four fields: ``Folder``, the path to the parent folder of each file; ``Old_Name``, the original name of the file; ``New_Name``, the name of the file following the renaming operation; and ``Changed``, which reads ``Y`` if ``New_Name`` is different from ``Old_Name`` and ``N`` if they are the same. Apart from giving you a simple way to check for any mistakes or unwanted behavior (e.g. timestamp changes), this file also allows you to reverse the renaming operation. If you run ``pycnet rename`` on a folder that already contains a file called ``[Target dir]_rename_log.csv``, pycnet will revert the name of each file to the name listed in the ``Old_Name`` column, then delete the log file to reset things for the next renaming attempt.
+
+	**Please note:** The ``rename_log.csv`` file is the only place where pycnet records the original names of your files. If the log file is lost or deleted, then that information is lost, and pycnet will not be able to reverse the renaming operation. Tread carefully.
+

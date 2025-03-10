@@ -5,6 +5,10 @@ Functions:
     buildFilename
         Construct a filename using a prefix and a timestamp.
 
+    buildFilePrefix
+        Construct a prefix for a file using one or more wildcards
+        based on its location in a directory.
+
     findFiles
         List all paths with a given extension in a directory 
         tree.
@@ -42,6 +46,7 @@ Functions:
 
 import datetime as dt
 import os
+import re
 import wave
 import pandas as pd
 from pathlib import Path
@@ -250,7 +255,49 @@ def inventoryFolder(target_dir, write_file=True, print_summary=True):
     return wav_inventory
 
 
-def buildFilename(file_path, prefix=''):
+def buildFilePrefix(file_path, prefix_string):
+    """Create a prefix for a file which may be based on its location.
+
+    Valid wildcards include: ``%p``, the name of the file's parent 
+    folder; ``%g``, the name of the file's "grandparent" folder (the 
+    parent folder of the parent folder), ``%c``, the partial parent
+    folder, i.e. the last component of the parent folder's name split 
+    up by underscores, and ``%h``, the partial grandparent folder, i.e.
+    the last component of the grandparent folder's name split up by
+    underscores.
+
+    Args:
+
+        file_path (str): Full path to the file for which a prefix will
+            be generated.
+
+        prefix_string (str): Prefix to use, which may include one or
+            more wildcards that will be replaced with components of the
+            file's path.
+
+    Returns:
+        str: The prefix created by substituting the appropriate path
+        components for their corresponding wildcards in the prefix
+        string provided.
+    """
+    file_dir = os.path.dirname(file_path)
+    file_dir_comps = file_dir.split(os.sep)
+    parent_dir, grandparent_dir = file_dir_comps[-1], file_dir_comps[-2]
+    partial_parent = parent_dir.split('_')[-1]
+    partial_grandparent = grandparent_dir.split('_')[-1]
+
+    replacements = {"%p":parent_dir, 
+                    "%g":grandparent_dir, 
+                    "%c":partial_parent,
+                    "%h":partial_grandparent}
+
+    for patt in replacements:
+        prefix_string = re.sub(patt, replacements[patt], prefix_string)
+
+    return(prefix_string)
+
+
+def buildFilename(file_path, prefix="%g-%c"):
     """Construct a filename using a prefix and a timestamp.
 
     If no prefix is provided, a prefix will be constructed based on the
@@ -265,6 +312,8 @@ def buildFilename(file_path, prefix=''):
         file_path (str): Full path to the file to be renamed.
 
         prefix (str): Prefix component of the filename to be generated.
+            Can include wildcards, which will be interpreted by 
+            buildFilePrefix().
 
     Returns:
 
@@ -273,16 +322,16 @@ def buildFilename(file_path, prefix=''):
 
     p = Path(file_path)
     file_dir = p.parent
-    
-    if prefix == '':
-        site_name, stn_dir_name = p.parts[-3], p.parts[-2]
-        stn_id = stn_dir_name.split('_')[-1]
-        new_prefix = "{0}-{1}".format(site_name, stn_id)
-    else:
-        new_prefix = prefix
-    
+
+    new_prefix = buildFilePrefix(file_path, prefix)
+
+    if re.search("%[a-zA-Z]", new_prefix):
+        print("\nWarning: One or more unrecognized wildcard options found in prefix string:", end='')
+        print(','.join(re.findall("%[a-zA-Z]", new_prefix)))
+        print("\nFilenames containing wildcards may behave unpredictably! Use at your own risk.")
+
     old_name, file_ext = p.stem, p.suffix
-    
+
     stamp_fmt = "%Y%m%d_%H%M%S"
     str_stamp = '_'.join(old_name.split('_')[-2:])
     try:
@@ -291,15 +340,20 @@ def buildFilename(file_path, prefix=''):
     except:
         stamp = dt.datetime.fromtimestamp(os.path.getmtime(file_path))
         new_stamp = stamp.strftime(stamp_fmt)
-    
+
     new_filename = "{0}_{1}{2}".format(new_prefix, new_stamp, file_ext)
     new_path = os.path.join(file_dir, new_filename)
-    
+
     return new_path
 
 
 def renameFiles(rename_log_df, revert=False):
     """Rename files based on values in a DataFrame.
+
+    If the values in the New_Name column are not unique, the renaming
+    operation will be aborted so as not to produce duplicate filenames
+    (including duplicate filenames in different folders). This is 
+    indicated by a return value of -1.
 
     Args:
 
@@ -313,7 +367,7 @@ def renameFiles(rename_log_df, revert=False):
     Returns:
 
         int: The number of files that were successfully renamed, or -1
-        if the renaming operation would have resulted in duplicate 
+        if the renaming operation was aborted due to duplicate 
         filenames.
     """
 
@@ -321,16 +375,16 @@ def renameFiles(rename_log_df, revert=False):
     dirs = rename_log_df["Folder"]
     old_names = rename_log_df["Old_Name"]
     new_names = rename_log_df["New_Name"]
-    
+
     old_paths, new_paths = [], []
-    
+
     for i in range(n_files):
         old_paths.append(os.path.join(dirs[i], old_names[i]))
         new_paths.append(os.path.join(dirs[i], new_names[i]))
-    
+
     rename_from = new_paths if revert else old_paths
     rename_to = old_paths if revert else new_paths
-    
+
     if len(set(new_names)) < n_files:
         return -1
     else:
@@ -347,8 +401,8 @@ def renameFiles(rename_log_df, revert=False):
 def massRenameFiles(top_dir, extension, prefix=''):
     """Rename all files with a given extension in a directory tree.
 
-    Runs in 'undo mode' if a file called Rename_Log.csv already exists 
-    in the directory provided.
+    Runs in 'undo mode' if a file called [Folder name]_rename_log.csv 
+    already exists in the directory provided.
 
     Args:
 
@@ -365,7 +419,8 @@ def massRenameFiles(top_dir, extension, prefix=''):
         Nothing.
     """
     
-    rename_log_path = os.path.join(top_dir, "Rename_Log.csv")
+    folder_name = os.path.basename(top_dir)
+    rename_log_path = os.path.join(top_dir, "{0}_rename_log.csv".format(folder_name))
     
     if os.path.exists(rename_log_path):
         rename_log_df = pd.read_csv(rename_log_path)
@@ -385,7 +440,7 @@ def massRenameFiles(top_dir, extension, prefix=''):
             old_path = to_rename[i]
             file_dir, old_name = os.path.split(old_path)
             
-            new_path = buildFilename(old_path)
+            new_path = buildFilename(old_path, prefix)
             new_name = os.path.basename(new_path)
             
             folders.append(file_dir)

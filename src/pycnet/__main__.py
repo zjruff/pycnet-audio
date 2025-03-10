@@ -134,7 +134,7 @@ def main():
 
 
         elif args.mode == "rename":
-            rename_args = [args.target_dir, "wav"]
+            rename_args = [args.target_dir, "wav", args.rename_prefix]
             pycnet.file.massRenameFiles(*rename_args)
             
 

@@ -366,7 +366,7 @@ def generateEmbeddings(target_dir, cnet_version, show_prog=True, check_images=Fa
         "embeddings" contains the embeddings for each image file.
     """
 
-    i = batchImageData(target_dir, check_images)
+    i = batchImageData(target_dir, check_images=check_images)
     image_paths = i["image_paths"]
     image_names = i["image_names"]
     image_batches = i["image_batches"]
@@ -900,6 +900,9 @@ def parsePycnetArgs():
 
     parser.add_argument("-o", dest="output_file", type=str,
         help="Manually specify filename for review file.")
+        
+    parser.add_argument("-p", dest="rename_prefix", type=str,
+        help="Prefix to use when renaming .wav files.")
         
     parser.add_argument("-l", dest="log_to_file", action="store_true",
         help="Copy output messages to log file.")

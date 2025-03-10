@@ -297,7 +297,7 @@ def buildFilePrefix(file_path, prefix_string):
     return(prefix_string)
 
 
-def buildFilename(file_path, prefix="%g-%c"):
+def buildFilename(file_path, prefix=''):
     """Construct a filename using a prefix and a timestamp.
 
     If no prefix is provided, a prefix will be constructed based on the
@@ -322,6 +322,9 @@ def buildFilename(file_path, prefix="%g-%c"):
 
     p = Path(file_path)
     file_dir = p.parent
+
+    if prefix == '':
+        prefix = "%g-%c"
 
     new_prefix = buildFilePrefix(file_path, prefix)
 
@@ -398,7 +401,7 @@ def renameFiles(rename_log_df, revert=False):
         return rename_count
 
 
-def massRenameFiles(top_dir, extension, prefix=''):
+def massRenameFiles(top_dir, extension, prefix=None):
     """Rename all files with a given extension in a directory tree.
 
     Runs in 'undo mode' if a file called [Folder name]_rename_log.csv 
@@ -418,10 +421,13 @@ def massRenameFiles(top_dir, extension, prefix=''):
 
         Nothing.
     """
-    
+
+    if prefix is None:
+        prefix = ''
+
     folder_name = os.path.basename(top_dir)
     rename_log_path = os.path.join(top_dir, "{0}_rename_log.csv".format(folder_name))
-    
+
     if os.path.exists(rename_log_path):
         rename_log_df = pd.read_csv(rename_log_path)
         print("\nRename_Log.csv already exists. Reverting previously renamed files...\n")
@@ -432,30 +438,30 @@ def massRenameFiles(top_dir, extension, prefix=''):
         to_rename = findFiles(top_dir, extension)
         n_files = len(to_rename)
         folders, old_names, new_names, changed = [], [], [], []
-        
+
         print("\nFound {0} files with extension {1} in target directory.".format(n_files, extension))
         print("Attempting to standardize filenames...")
-        
+
         for i in range(n_files):
             old_path = to_rename[i]
             file_dir, old_name = os.path.split(old_path)
-            
+
             new_path = buildFilename(old_path, prefix)
             new_name = os.path.basename(new_path)
-            
+
             folders.append(file_dir)
             old_names.append(old_name)
             new_names.append(new_name)
-            
+
             if old_path != new_path:
                 changed.append('Y')
             else:
                 changed.append('N')
-    
+
         rename_log_df = pd.DataFrame(data={"Folder":folders, "Old_Name":old_names, "New_Name":new_names, "Changed":changed})
-        
+
         rename_count = renameFiles(rename_log_df, revert=False)
-        
+
         if rename_count == -1:
             print("\nRenaming would result in duplicate filenames!\n")
             print("Renaming operation canceled.\n")

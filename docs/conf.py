@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'pycnet-audio'
 copyright = '2024, Zachary J. Ruff'
 author = 'Zachary J. Ruff'
-release = '0.5.8'
+release = '0.5.9'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

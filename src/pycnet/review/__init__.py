@@ -480,10 +480,10 @@ def tallyDetections(pred_table, score_threshold):
 
     class_names = pred_table.columns[1:]
     class_scores = pred_table[class_names]
-    dets_tf = class_scores.applymap(lambda x: x >= score_threshold)
+    dets_tf = class_scores.apply(lambda x: x >= score_threshold)
     dets_tf = pd.concat([clip_info, dets_tf], axis=1)
 
-    dets_aggregated = dets_tf.groupby(group_fields).aggregate(dict([(code, sum) for code in class_names]))
+    dets_aggregated = dets_tf.groupby(group_fields).aggregate(dict([(code, "sum") for code in class_names]))
     n_rows = dets_aggregated.shape[0]
     dets_aggregated.insert(loc=0, column="Threshold", value=[score_threshold for i in range(n_rows)])
 

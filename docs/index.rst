@@ -13,32 +13,43 @@ Welcome to pycnet-audio!
 .. contents:: Contents
 
 
-**pycnet-audio** is a software package for bioacoustics data processing using the PNW-Cnet deep learning model. pycnet-audio provides easy-to-use command-line tools for executing standard data processing workflows. As a Python package, it also provides importable modules that can be incorporated into your Python code to define your own workflows for processing audio data. To see the formal package documentation, check the links under Module Reference. For installation instructions, detailed usage notes and tutorials, keep reading.
+**pycnet-audio** is a software package for bioacoustics data processing using the PNW-Cnet deep learning model. pycnet-audio provides easy-to-use command-line tools for executing standard data processing workflows. As a Python package, it also provides importable modules that can be incorporated into your Python code to define your own workflows for processing audio data. To see the formal package documentation, check the links under Module Reference. For installation instructions, detailed usage notes, and tutorials, keep reading.
 
-This guide generally assumes that you are running a 64-bit version of Windows. pycnet-audio is theoretically platform-agnostic, but we have not tested it extensively on GNU/Linux or MacOS systems. Language geared toward users on these platforms may be added in the future.
+This guide generally assumes that you are running a 64-bit version of Windows. pycnet-audio is theoretically platform-agnostic, but we have not tested it extensively on GNU/Linux or MacOS systems. Language geared toward users on these platforms may be added in the future. pycnet-audio will not run on 32-bit operating systems.
 
-.. admonition:: Background
+Background
+----------
 
-	The PNW-Cnet model was developed by the U.S. Forest Service and is used to facilitate passive acoustic monitoring of Northern spotted owls (*Strix occidentalis caurina*; "NSO") and other forest wildlife in the Pacific Northwest, U.S.A. The NSO monitoring program is now one of the largest acoustic data collection efforts in the world, generating >2 million hours of recordings annually from >1,000 field sites in Washington, Oregon, and California. PNW-Cnet was first developed in 2018 and has since undergone several major retrainings; the current version, PNW-Cnet v5, detects ca. 75 species of wild birds and mammals found in the Northwest, as well as various forms of anthropogenic and environmental noise.
-	
-	For more information on the NSO monitoring program, `visit our website <https://www.damonlesmeister.com/>`_.
+The PNW-Cnet model was developed by the U.S. Forest Service and is used to facilitate passive acoustic monitoring of Northern spotted owls (*Strix occidentalis caurina*; "NSO") and other forest wildlife in the Pacific Northwest, U.S.A. The NSO monitoring program is now one of the largest acoustic data collection efforts in the world, generating >2 million hours of recordings annually from >1,000 field sites in Washington, Oregon, and California. PNW-Cnet was first developed in 2018 and has since undergone several major retrainings; the current version, PNW-Cnet v5, detects ca. 75 species of wild birds and mammals found in the Northwest, as well as various forms of anthropogenic and environmental noise.
+
+For more information on the NSO monitoring program, `visit our website <https://www.damonlesmeister.com/>`_.
 
 .. admonition:: A note on naming
 
 	The name **pycnet** is a portmanteau of **Py**\thon and PNW-**Cnet**\, chosen for being short, punchy, and easy to type. The main importable module provided by this package is called pycnet, as is the main command-line tool used to process data, so we initially planned to use pycnet as the name of the distribution package as well. Tragically, this name was already taken on PyPI.org, so to avoid ambiguity, the distribution package is called pycnet-audio. Practically, this just means you'll need to use the name **pycnet-audio** when installing or updating the package using pip. For all other purposes, including running the command-line tools as well as using the functions and classes exported by the module in your own code, use **pycnet**.
 
 
-Installation
-============
+I. Installation
+===============
 
-pycnet-audio can be installed from the `Python Package Index <https://pypi.org/>`_ using the ``pip`` tool, which comes bundled with all modern Python distributions. You will need a version of Python between 3.8 and 3.11, and to use the program in full, you will also need to install `SoX <https://sourceforge.net/projects/sox/>`_. To simplify setup and dependency management, we recommend using a dedicated Conda environment. Conda has many uses, but for our purposes, you can think of a Conda environment as a self-contained Python installation that can be created, configured, and deleted without affecting the operation of other software on your system. Conda environments can also be readily "cloned," which makes it straightforward to set up identical environments on multiple machines.
+pycnet-audio is distributed through the `Python Package Index <https://pypi.org/>`_ using standard Python package management tools. The most straightforward way to get everything set up is to install a `Conda <https://en.wikipedia.org/wiki/Conda_(package_manager)>`_ client and use it to install pycnet-audio in a dedicated *conda environment*. This streamlines the installation and also ensures that the different components can all find each other when you are ready to use the program. (You can think of a Conda environment as a self-contained Python installation that can be created, configured, and deleted without affecting the operation of other software on your system. Conda environments can also be readily "cloned," which makes it straightforward to set up identical environments on multiple machines.)
 
-To set up a Conda environment, you will need to install either Anaconda or Miniconda. We recommend using Miniconda, which is designed to be lightweight and modular, whereas Anaconda is a fairly heavy-duty suite containing a variety of scientific software, most of which is not relevant for our purposes. So, the first step is to `install Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_. On a Windows machine, this will give you access to a command shell program called Anaconda Prompt, which you can then use to install everything else. Open Anaconda Prompt and run 
+Step 1. Install Miniconda
+-------------------------
+
+We recommend using Miniconda as your conda client, as it is designed to be lightweight and modular. The other main client, Anaconda, is a fairly heavy-duty suite of scientific software, most of which is not relevant for our purposes. However, either program should work. Instructions for installing Miniconda can be found `here <https://www.anaconda.com/docs/getting-started/miniconda/install>`_. Once Miniconda is installed, you will have access to a command-line interface called Anaconda Prompt, which you can then use to install everything else. 
+
+Step 2. Create a conda environment
+----------------------------------
+
+Open the Anaconda Prompt and run 
 ::
 
 	conda create -n pycnet -c conda-forge sox python=3.11
 
-Hit Enter when you are prompted to proceed. This will create a new conda environment called pycnet with Python 3.11 installed and will install SoX to it from the conda-forge repository. (The `conda-forge repository <https://conda-forge.org/>`_ is maintained by the open-source community and, unlike the repositories maintained by Anaconda, Inc., it does not require a license to use.)
+Hit Enter when you are prompted to proceed.
+
+This will create a new conda environment called ``pycnet`` and will install Python version 3.11 and SoX to it. (`SoX <https://sourceforge.net/projects/sox/>`_ is an open-source command-line program that pycnet uses for some aspects of audio processing. Here we are installing SoX as a package from the `conda-forge repository <https://conda-forge.org/>`_, which is maintained by the open-source community; unlike the repositories maintained by Anaconda, Inc., it does not require a license to use.)
 
 If all goes well, you should see a message that looks like this:
 ::
@@ -57,7 +68,12 @@ If all goes well, you should see a message that looks like this:
 
 	(base) C:\Users\zjruf>
 
-Note the ``(base)`` at the beginning of the prompt on the last line. This indicates that the ``base`` Conda environment is active. As mentioned in the message above, we can now activate the ``pycnet`` environment by running
+Note the ``(base)`` at the beginning of the prompt on the last line. This indicates that the ``base`` Conda environment is active. 
+
+Step 3. Install pycnet-audio
+----------------------------
+
+As mentioned in the message above, we can now activate the ``pycnet`` environment by running
 ::
 
 	conda activate pycnet
@@ -67,7 +83,19 @@ Note the ``(base)`` at the beginning of the prompt on the last line. This indica
 
 	pip install pycnet-audio
 
-pip will search the Python Package Index for the **pycnet-audio** package and will automatically install the latest version and its dependencies (and its dependencies' dependencies, etc.) to the pycnet environment. This may take some time and there will be a lot of output in the console, but as long as you don't see the word ``ERROR``, everything is probably working fine.
+``pip`` is the most common tool used to install third-party Python packages and comes bundled with all modern Python installations. When you run this command, pip will search the Python Package Index for the **pycnet-audio** package and will automatically install the latest version and its dependencies (and its dependencies' dependencies, etc.) to the pycnet environment. This may take some time and there will be a lot of output in the console, but as long as you don't see the word ``ERROR``, everything is probably working fine.
+
+.. note::
+
+	If you ever want to update pycnet-audio (or any other package), you can do so by running
+	::
+
+		pip install --upgrade pycnet-audio
+	
+	If the package has a release listed on PyPI.org that's newer than the version you're using, pip will automatically download and install it for you. You can also specify an exact version of the package you want, which doesn't have to be newer than the one currently installed, so this can also be used to "downgrade" a package to an older version. See `pip's documentation <https://pip.pypa.io/en/stable/user_guide/>`_ for details.
+
+Step 4. (Optional) Test pycnet-audio
+------------------------------------
 
 Once the package has been installed, you can verify that everything is working correctly by running 
 ::
@@ -87,17 +115,16 @@ This will run the TestPycnet script, which will create a temporary folder in the
 
 Hit Enter to delete the temporary test folder, then give yourself a pat on the back. You have successfully installed pycnet-audio!
 
-.. note::
+Alternatives
+------------
 
-	If you ever want to update pycnet-audio (or any other package), you can do so by running
-	::
+We recommend installing pycnet-audio in a dedicated conda environment for overall simplicity and ease of dependency management; however, it is not strictly necessary. If you already have a compatible Python installation that you want to continue using, you can simply install pycnet-audio using pip without going through steps 1 and 2 above.
 
-		pip install --upgrade pycnet-audio
-	
-	If the package has a release listed on PyPI.org that's newer than the version you're using, pip will automatically download and install it for you. You can also specify the exact version you want, which doesn't have to be newer than the one currently installed, so this can also be used to "downgrade" a package to an older version. See `pip's documentation <https://pip.pypa.io/en/stable/user_guide/>`_ for details.
+In this case, you will need to install SoX as a standalone program. Simply `download the SoX installer <https://sourceforge.net/projects/sox/>`_ from the project page and run it as an executable. It doesn't really matter where SoX is installed, but you will need to make sure its install location is listed in your PATH environment variable, such that your operating system knows where to find the program if you call e.g. ``sox --version`` from the command line.
 
-Using pycnet
-============
+
+II. Using pycnet
+================
 
 In the course of running a large-scale acoustic monitoring program, we have developed a reasonably efficient workflow for processing bioacoustics data. This workflow consists of a number of distinct steps that are completed in sequence, beginning with a set of audio files that have been retrieved from the field and ending with a set of target species detections that can be analyzed to make ecological inferences. The steps in our workflow are as follows:
 

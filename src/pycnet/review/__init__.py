@@ -79,12 +79,13 @@ def readPredFile(pred_file_path):
 
     Returns:
 
-         Pandas.DataFrame: DataFraem containing PNW-Cnet class scores
+         Pandas.DataFrame: DataFrame containing PNW-Cnet class scores
          indexed by image filename.
     """
     
-    pred_table = pd.read_csv(pred_file_path)
-    return pred_table
+    pred_df = pd.read_csv(pred_file_path)
+    
+    return pred_df
 
 
 def getClipInfo(clip_name):
@@ -201,14 +202,16 @@ def buildClipDataFrame(pred_table):
     return clip_df
 
 
-def getSourceFile(clip_name):
-    """Return the name of the .wav file from which a clip was taken.
+def getSourceFile(clip_name, ext=".wav"):
+    """Return the name of the audio file from which a clip was taken.
 
     Args:
 
         clip_name (str): Filename created by concatenating the name of
             the source file, a string indicating a position within that
             file (e.g. "part_017"), and a file extension (".png").
+
+        ext (str): File extension of the source audio files.
 
     Returns:
 
@@ -223,12 +226,13 @@ def getSourceFile(clip_name):
         return ("", "")
     else:
         base_name = os.path.splitext(clip_name)[0]
-        source_file = base_name.split("_part")[0] + ".wav"
+        source_file = base_name.split("_part")[0] + ext
         str_part = part_pattern.findall(base_name)[0]
         return (source_file, str_part)
 
 
-def getSourceFolders(clip_list, mode="from_source_files", top_dir="", prefix=""):
+def getSourceFolders(clip_list, mode="from_source_files", top_dir="", 
+                    prefix="", flac_mode=False):
     """Get locations of a set of files within a directory tree.
 
     This function will attempt to associate each spectrogram image
@@ -259,6 +263,9 @@ def getSourceFolders(clip_list, mode="from_source_files", top_dir="", prefix="")
             construct the source folder. Used if mode == 
             "from_clip_names".
 
+        flac_mode (bool): Assume audio files are .flac fomat rather
+            than .wav.
+
     Returns:
 
         Pandas.DataFrame: DataFrame listing the folder (relative to 
@@ -266,20 +273,25 @@ def getSourceFolders(clip_list, mode="from_source_files", top_dir="", prefix="")
         filename for each clip.
     """
     
-    source_file_list, part_list = zip(*[getSourceFile(clip) for clip in clip_list])
-    source_file_df = pd.DataFrame(data={"Filename": clip_list, "IN_FILE": source_file_list, "PART": part_list})
+    file_ext = ".flac" if flac_mode else ".wav"
     
+    source_file_list, part_list = zip(*[getSourceFile(clip, file_ext) for clip in clip_list])
+    source_file_df = pd.DataFrame(data={"Filename": clip_list, 
+                                        "Stem": [Path(x).stem for x in source_file_list], 
+                                        "PART": part_list})
+
     if mode == "from_source_files":
-        wav_inv_path = os.path.join(top_dir, "{0}_wav_inventory.csv".format(os.path.basename(top_dir)))
-        if not os.path.exists(wav_inv_path):
-            wav_df = pycnet.file.inventoryFolder(top_dir)
+        inv_file_path = Path(top_dir, f"{Path(top_dir).name}_{file_ext[1:]}_inventory.csv")
+        if not os.path.exists(inv_file_path):
+            inv_df = pycnet.file.inventoryFolder(top_dir, print_summary=False, flac_mode=flac_mode)
         else:
-            wav_df = pd.read_csv(wav_inv_path)
+            inv_df = pd.read_csv(inv_file_path)
 
-        wav_df.rename(columns={"Folder": "FOLDER", "Filename": "IN_FILE"}, inplace=True)
+        inv_df.rename(columns={"Folder": "FOLDER", "Filename": "IN_FILE"}, inplace=True)
+        inv_df["Stem"] = [Path(x).stem for x in inv_df["IN_FILE"]]
 
-        joined_df = source_file_df.merge(wav_df, how="left", on="IN_FILE")
-        
+        joined_df = source_file_df.merge(inv_df, how="left", on="Stem")
+
         if joined_df.shape[0] != source_file_df.shape[0]:
             print("Warning! Either source files could not be located for all clips or some clips are associated with duplicate filenames.")
             return
@@ -288,7 +300,6 @@ def getSourceFolders(clip_list, mode="from_source_files", top_dir="", prefix="")
     
     elif mode == "from_clip_names":
         stn_list = [prefix + getClipInfo(clip)["Stn"] for clip in clip_list]
-        # stn_list = [prefix + re.split("[-._]", clip)[2] for clip in clip_list]
 
         source_file_df.insert(loc=0, column="FOLDER", value=stn_list)
 
@@ -614,7 +625,10 @@ def makeReviewTable(pred_table, cnet_version="v5", review_settings=None):
     return review_df
 
 
-def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_settings=None, timescale="weekly", infer_source_folders=False, source_folder_prefix=""):
+def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", 
+                        review_settings=None, timescale="weekly", 
+                        infer_source_folders=False, 
+                        source_folder_prefix="", flac_mode=False):
     """Extract & format apparent detections for review in Kaleidoscope.
 
     Args:
@@ -641,6 +655,9 @@ def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_sett
         source_folder_prefix (str): Prefix to combine with the station
             ID code to construct the names of source folders.
 
+        flac_mode (bool): Assume source audio files are .flac instead
+            of .wav.
+
     Returns:
 
         Pandas.DataFrame: DataFrame listing apparent detections of one 
@@ -660,9 +677,9 @@ def makeKscopeReviewTable(pred_table, target_dir, cnet_version="v5", review_sett
         n_clips = review_df.shape[0]
 
         if infer_source_folders:
-            source_df = getSourceFolders(review_df.Filename, mode="from_clip_names", prefix=source_folder_prefix)
+            source_df = getSourceFolders(review_df.Filename, mode="from_clip_names", prefix=source_folder_prefix, flac_mode=flac_mode)
         else:
-            source_df = getSourceFolders(review_df.Filename, mode="from_source_files", top_dir=target_dir)
+            source_df = getSourceFolders(review_df.Filename, mode="from_source_files", top_dir=target_dir, flac_mode=flac_mode)
 
         output_df = review_df.merge(source_df, how="inner", on="Filename")
 

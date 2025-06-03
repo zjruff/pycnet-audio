@@ -35,6 +35,7 @@ def main():
         auto_cleanup = args.auto_cleanup
         log_to_file = args.log_to_file
         combine_output = args.combine_output
+        flac_mode = args.flac_mode
         
 
         if args.mode == "process":
@@ -47,7 +48,8 @@ def main():
                 log_to_file=log_to_file, 
                 show_prog=show_prog, 
                 cleanup=auto_cleanup, 
-                check_images=check_images)
+                check_images=check_images,
+                flac_mode=flac_mode)
 
 
         elif args.mode == "batch_process":
@@ -74,7 +76,8 @@ def main():
                 show_prog=show_prog, 
                 cleanup=auto_cleanup, 
                 check_images=check_images,
-                combine_output=combine_output)
+                combine_output=combine_output,
+                flac_mode=flac_mode)
 
 
         elif args.mode == "combine":
@@ -93,7 +96,7 @@ def main():
                 exit()
             
             combine_args = [dir_list, args.cnet_version, args.review_settings]
-            pycnet.process.combineOutputFiles(*combine_args)
+            pycnet.process.combineOutputFiles(*combine_args, flac_mode=flac_mode)
 
 
 
@@ -103,7 +106,8 @@ def main():
                 *spectro_args, 
                 log_to_file=log_to_file, 
                 show_prog=show_prog, 
-                cleanup=auto_cleanup)
+                cleanup=auto_cleanup,
+                flac_mode=flac_mode)
 
 
         elif args.mode == "predict":
@@ -115,7 +119,8 @@ def main():
                 output_file=args.output_file, 
                 log_to_file=log_to_file, 
                 cleanup=auto_cleanup, 
-                check_images=check_images)
+                check_images=check_images,
+                flac_mode=flac_mode)
 
 
         elif args.mode == "review":
@@ -125,16 +130,20 @@ def main():
                 review_settings=args.review_settings, 
                 output_file=args.output_file, 
                 log_to_file=log_to_file, 
-                cleanup=auto_cleanup)
+                cleanup=auto_cleanup,
+                flac_mode=flac_mode)
 
 
         elif args.mode == "inventory":
             inv_args = [args.target_dir]
-            pycnet.file.inventoryFolder(*inv_args)
+            pycnet.file.inventoryFolder(
+                *inv_args,
+                flac_mode=flac_mode)
 
 
         elif args.mode == "rename":
-            rename_args = [args.target_dir, "wav", args.rename_prefix]
+            ext = ".flac" if flac_mode else ".wav"
+            rename_args = [args.target_dir, ext, args.rename_prefix]
             pycnet.file.massRenameFiles(*rename_args)
             
 

@@ -45,6 +45,7 @@ Functions:
 """
 
 import datetime as dt
+import multiprocessing as mp
 import os
 import re
 import wave
@@ -55,7 +56,7 @@ from . import image
 from . import wav
 
 
-def findFiles(top_dir, file_ext):
+def findFiles(top_dir, file_ext, ignore_case=True):
     """List all files with a given extension in a directory tree.
 
     Args:
@@ -66,18 +67,28 @@ def findFiles(top_dir, file_ext):
         file_ext (str): File extension of files to look for. A leading 
             dot (.) is not necessary but will not hurt anything.
 
+        ignore_case (bool): Treat upper- and lowercase file extensions 
+            the same. (File paths are case-sensitive on Unix-based 
+            systems but not on Windows.)
+
     Returns:
 
-        list[str]: A sorted list of paths to files with extension 
-        file_ext in the directory tree rooted at top_dir.
+        list: A sorted list of strings representing paths of files with
+        extension file_ext in the directory tree rooted at top_dir.
     """
 
-    files_found = []
-    for root, dirs, files in os.walk(top_dir):
-        for file in files:
-            if file.split('.')[-1] == file_ext.replace('.', ''):
-                files_found.append(os.path.join(root, file))
-    return sorted(files_found)
+    ext_no_dot = file_ext.replace('.', '')
+
+    if ignore_case:	
+        patt = ''.join(["[{0}{1}]".format(c.lower(), c.upper()) for c in ext_no_dot])
+    else:
+        patt = ext_no_dot
+
+    glob_patt = "*.{0}".format(patt)
+
+    file_list = sorted([str(x) for x in Path(top_dir).rglob(glob_patt)])
+
+    return file_list
 
 
 def getFileSize(file_path, units='gb'):
@@ -152,19 +163,18 @@ def makeFileInventory(path_list, top_dir, use_abs_path=False):
     """
 
     top_path = Path(top_dir)
+    paths = [Path(p) for p in path_list]
 
     file_dict = {"Folder":[], "Filename":[], "Size":[], "Duration":[]}
 
-    for path in path_list:
-        file_path = Path(path)
-        if use_abs_path:
-            file_dict["Folder"].append(file_path.parent)
-        else:
-            file_dict["Folder"].append(getFolder(path, top_dir))
-        file_dict["Filename"].append(os.path.basename(path))
-        file_dict["Size"].append(getFileSize(path, 'b'))
-        if file_path.suffix == ".wav":
-            file_dict["Duration"].append(wav.getWavLength(path, 's'))
+    for p in paths:
+        file_dict["Folder"].append(p.parent if use_abs_path else getFolder(p, top_dir))
+        file_dict["Filename"].append(p.name)
+        file_dict["Size"].append(getFileSize(p, 'b'))
+        if p.suffix.lower() == ".wav":
+            file_dict["Duration"].append(wav.getWavLength(p, 's'))
+        elif p.suffix.lower() == ".flac":
+            file_dict["Duration"].append(wav.getFlacLength(p, 's'))
         else:
             file_dict["Duration"].append("NA")
 
@@ -173,50 +183,125 @@ def makeFileInventory(path_list, top_dir, use_abs_path=False):
     return file_df
 
 
+def buildAudioFileDF(top_dir, file_types=["wav", "flac"], n_workers=None):
+    """Get information from a set of audio files in a directory tree.
+
+    Officially the only supported file types are WAV and FLAC. This 
+    function uses ``sox --i`` to get information on each file, so it 
+    should work with any audio file format that includes a 
+    self-describing header.
+    
+    This is not currently used for anything specific in pycnet; it 
+    returns slightly more information than makeFileInventory but is
+    much slower. We may try to make it more efficient / useful in 
+    future, but don't hold your breath.
+
+    Args:
+
+        top_dir (str): Root of the directory tree to be searched.
+
+        file_types (list): List of file extensions to search for.
+
+        n_workers (int): Number of worker processes to use.
+
+    Returns:
+
+        pandas.DataFrame: DataFrame containing basic info on each file.
+    """
+
+    files = []
+    for ext in file_types:
+        files.extend(findFiles(top_dir, ext))
+    files.sort()
+    
+    n_files = len(files)
+
+    if n_workers is None:
+        n_workers = min(n_files, mp.cpu_count())
+
+    with mp.Pool(n_workers) as p:
+        file_info_all = ''.join(p.map(wav.getAudioFileInfo, files))
+
+    path_listings = re.findall("Input File[ :]+[\S]+", file_info_all)
+    channel_listings = re.findall("Channels[ :]*[0-9]+", file_info_all)
+    sample_rate_listings = re.findall("Sample Rate[ :]*[0-9]+", file_info_all)
+    n_sample_listings = re.findall("[0-9]+ samples", file_info_all)
+    bit_depth_listings = re.findall("Precision[ :]+[0-9]+-bit", file_info_all)
+
+    path_list = [x.split(' ')[-1].replace("'", "") for x in path_listings]
+    channels_list = [int(x.split(' ')[-1]) for x in channel_listings]
+    sample_rate_list = [int(x.split(' ')[-1]) for x in sample_rate_listings]
+    n_samples_list = [int(x.split(' ')[0]) for x in n_sample_listings]
+    bit_depth_list = [int(x.split(' ')[-1].replace("-bit", "")) for x in bit_depth_listings]
+
+    duration_list = [n_samples_list[i] / sample_rate_list[i] for i in range(n_files)]
+    file_size_list = [os.path.getsize(x) for x in files]
+    filename_list = [Path(x).name for x in path_list]
+    folder_list = [Path(x).parent.relative_to(top_dir) for x in path_list]
+
+    file_info_df = pd.DataFrame(data = {"Path": path_list,
+        "Folder": folder_list,
+        "Filename": filename_list,    
+        "Channels": channels_list, 
+        "Sample_Rate": sample_rate_list, 
+        "Samples": n_samples_list,
+        "Duration": duration_list,
+        "Bit_Depth": bit_depth_list,
+        "Size": file_size_list})
+
+    return file_info_df
+
+
 def readInventoryFile(inventory_path):
     """Read a .wav file inventory dataframe from a CSV file.
 
     Args:
 
-        inventory_path (str): Path to a CSV file containing information on .wav
-            files within a folder.
+        inventory_path (str): Path to a CSV file containing information
+            on audio files within a folder.
 
     Returns:
 
         pandas.DataFrame: DataFrame with one row for each .wav file 
         listing its folder (absolute or relative to top_dir), filename,
         size in bytes, and duration in seconds.
-
     """
-    wav_inventory = pd.read_csv(inventory_path, converters={"Folder": str, "Filename": str, "Size": int, "Duration": float})
-    
+
+    wav_inventory = pd.read_csv(inventory_path, 
+                                converters={"Folder": str, 
+                                            "Filename": str, 
+                                            "Size": int, 
+                                            "Duration": float})
+
     return wav_inventory
 
 
-def summarizeInventory(wav_inventory):
-    """Summarize a table of info on .wav files in human-readable form.
+def summarizeInventory(inventory_df, ext=".wav"):
+    """Summarize a table of info on audio files in human-readable form.
 
     Args:
 
-        wav_inventory (Pandas.DataFrame): DataFrame containing 
-            information on .wav files in a directory tree, as produced 
+        inventory_df (Pandas.DataFrame): DataFrame containing 
+            information on audio files in a directory tree, as produced 
             by makeFileInventory.
+
+        ext (str): Extension of the audio files to be summarized.
 
     Returns:
 
         str: A human-readable summary of the audio dataset.
     """
 
-    n_wav_files = len(wav_inventory)
-    wav_lengths = wav_inventory["Duration"]
-    wav_sizes = wav_inventory["Size"]
-    total_dur, total_gb = sum(wav_lengths) / 3600., sum(wav_sizes) / 1024.**3
-    summary = "Directory contains {0} .wav files.\nTotal duration: {1:.1f} h\nTotal size: {2:.1f} GB".format(n_wav_files, total_dur, total_gb)
+    n_audio_files = len(inventory_df)
+    durs = inventory_df["Duration"]
+    sizes = inventory_df["Size"]
+    total_dur, total_gb = sum(durs) / 3600., sum(sizes) / 1024.**3
+    summary = "Directory contains {0} {1} files.\nTotal duration: {2:.1f} h\nTotal size: {3:.1f} GB".format(n_audio_files, ext, total_dur, total_gb)
     return summary
 
 
-def inventoryFolder(target_dir, write_file=True, print_summary=True):
-    """Inventory .wav files in a folder and write the info to a file.
+def inventoryFolder(target_dir, write_file=True, print_summary=True, flac_mode=False):
+    """Inventory audio files in a folder and write the info to a file.
 
     Args:
 
@@ -230,8 +315,11 @@ def inventoryFolder(target_dir, write_file=True, print_summary=True):
             print a human-readable summary of the .wav files that were
             found.
 
+        flac_mode (bool): Inventory .flac files rather than .wav files.
+
     Returns:
-        Pandas.DataFrame: DataFrame listing each .wav file in the 
+
+        Pandas.DataFrame: DataFrame listing each audio file in the 
         directory tree, its path relative to target_dir, the size of 
         the file, and its duration in seconds.
     """
@@ -240,19 +328,20 @@ def inventoryFolder(target_dir, write_file=True, print_summary=True):
         print("\nNo valid target directory provided.\n")
         return
     else:
-        dir_name = os.path.basename(target_dir)
-        inv_file = os.path.join(target_dir, "{0}_wav_inventory.csv".format(dir_name))
+        target_ext = ".flac" if flac_mode else ".wav"
+        paths = findFiles(target_dir, target_ext)
 
-        wav_paths = findFiles(target_dir, ".wav")
-        wav_inventory = makeFileInventory(wav_paths, target_dir)
+        inventory_df = makeFileInventory(paths, target_dir)
 
         if print_summary:
-            summarizeInventory(wav_inventory)
-        
+            print('\n' + summarizeInventory(inventory_df, target_ext) + '\n')
+
         if write_file:
-            wav_inventory.to_csv(inv_file, index=False)
-    
-    return wav_inventory
+            dir_name = os.path.basename(target_dir)
+            inv_file = os.path.join(target_dir, "{0}_{1}_inventory.csv".format(dir_name, target_ext.replace(".", "")))
+            inventory_df.to_csv(inv_file, index=False)
+
+    return inventory_df
 
 
 def buildFilePrefix(file_path, prefix_string):

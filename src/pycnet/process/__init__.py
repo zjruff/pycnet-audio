@@ -34,8 +34,8 @@ Functions:
         Generate a set of spectrograms representing segments of the 
         audio data.
 
-    getWavPaths
-        Reconstruct absolute paths to .wav files listed in a DataFrame 
+    getFullPaths
+        Reconstruct absolute paths to audio files listed in a DataFrame 
         containing filenames and relative paths.
 
     logMessage
@@ -60,7 +60,7 @@ from pathlib import Path
 from pycnet.cnet import v4_class_names, v5_class_names, v4_model_path, v5_model_path
 
 
-def getWavPaths(wav_inventory, top_dir):
+def getFullPaths(inventory_df, top_dir):
     """Reconstruct full paths for wav files listed in the inventory.
     
     Args:
@@ -78,20 +78,20 @@ def getWavPaths(wav_inventory, top_dir):
         wav_inventory.
     """
     
-    wi = wav_inventory
-    n_wavs = len(wi)
+    inv = inventory_df
+    n_files = len(inv)
     
-    if os.path.exists(wi["Folder"][0]):
-        comps = zip(wi["Folder"], wi["Filename"])
+    if os.path.exists(inv["Folder"][0]):
+        comps = zip(inv["Folder"], inv["Filename"])
     else:
-        comps = zip([top_dir for i in range(n_wavs)], wi["Folder"], wi["Filename"])
+        comps = zip([top_dir for i in range(n_files)], inv["Folder"], inv["Filename"])
     
-    wav_paths = [os.path.join(*i) for i in comps]
+    full_paths = [Path(*i) for i in comps]
     
-    return wav_paths
+    return full_paths
 
 
-def buildProcQueue(input_dir, image_dir, n_chunks=0):
+def buildProcQueue(inv_df, input_dir, image_dir, n_chunks=0):
     """Return a queue of input file paths mapped to output folders.
     
     If n_chunks is not supplied, the function will try to avoid 
@@ -99,7 +99,11 @@ def buildProcQueue(input_dir, image_dir, n_chunks=0):
     
     Arguments:
         
-        input_dir (str): Root of the directory tree containing .wav 
+        inv_df (Pandas.DataFrame): Dataframe containing basic 
+            information on audio files to be processed, as produced by
+            pycnet.file.inventoryFolder.
+        
+        input_dir (str): Root of the directory tree containing audio 
             files.
         
         image_dir (str): Path to the directory where spectrograms 
@@ -114,25 +118,21 @@ def buildProcQueue(input_dir, image_dir, n_chunks=0):
         "spectro_dirs", a list of folders where spectrograms will be 
         generated.
     """
-    
-    dir_name = os.path.basename(input_dir)
-    inv_file = os.path.join(input_dir, "{0}_wav_inventory.csv".format(dir_name))
-    
-    wav_inventory = pycnet.file.readInventoryFile(inv_file)
-    wav_paths = getWavPaths(wav_inventory, input_dir)
 
-    total_dur = sum(wav_inventory["Duration"]) / 3600.
+    audio_file_paths = getFullPaths(inv_df, input_dir)
+
+    total_dur = sum(inv_df["Duration"]) / 3600.
     n_images = total_dur * 300
     
     if n_chunks == 0:
         n_chunks = int(n_images / 50000) + min(n_images % 50000, 1)
 
-    todo = pycnet.file.wav.makeSpectroDirList(wav_paths, image_dir, n_chunks)
+    todo = pycnet.file.wav.makeSpectroDirList(audio_file_paths, image_dir, n_chunks)
     spectro_dirs = list(set([k[1] for k in todo]))
 
     proc_queue = mp.JoinableQueue()
-    for wav in todo:
-        proc_queue.put(wav)
+    for file in todo:
+        proc_queue.put(file)
 
     return {"queue":proc_queue, "dirs":spectro_dirs}
 
@@ -334,7 +334,8 @@ def generateClassScores(target_dir, model_path, show_prog=True, check_images=Fal
     return predictions
 
 
-def generateEmbeddings(target_dir, cnet_version, show_prog=True, check_images=False):
+def generateEmbeddings(target_dir, cnet_version, show_prog=True, 
+                       check_images=False):
     """Generate embeddings for a set of images using PNW-Cnet.
 
     Embeddings are the activation of the penultimate fully-connected 
@@ -458,7 +459,10 @@ def blockMessage(message, pad_char='#', width=80):
     return formatted_message
 
 
-def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, output_file=None, log_to_file=False, show_prog=True, cleanup=False, check_images=True):
+def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, 
+                n_workers=None, review_settings=None, output_file=None, 
+                log_to_file=False, show_prog=True, cleanup=False, 
+                check_images=True, flac_mode=False):
     """Perform one or more processing operations on data in a folder.
 
     Basically runs through the functions above in a logical sequence to
@@ -509,6 +513,8 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
             images can be loaded before attempting to generate class 
             scores. Skipping this step will save a bit of time but the
             program will crash if it encounters an unloadable image.
+            
+        flac_mode (bool): Process .flac files instead of .wav files.
 
     Returns:
 
@@ -517,45 +523,49 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
 
     ### Preliminary housekeeping ###
     time_fmt = "%b %d at %H:%M:%S"
+    audio_ext = ".flac" if flac_mode else ".wav"
 
     folder_name = os.path.basename(target_dir)
+
     output_prefix = "{0}_{1}".format(folder_name, cnet_version)
 
-    wav_inv_file = os.path.join(target_dir, "{0}_wav_inventory.csv".format(folder_name))
-    class_score_file = os.path.join(target_dir, "{0}_class_scores.csv".format(output_prefix))
-    det_sum_file = os.path.join(target_dir, "{0}_detection_summary.csv".format(output_prefix))
+    inv_name = "{0}_{1}_inventory.csv".format(folder_name, audio_ext[1:])
+    inv_file = Path(target_dir, inv_name)
+
+    class_score_file = Path(target_dir, "{0}_class_scores.csv".format(output_prefix))
+    det_sum_file = Path(target_dir, "{0}_detection_summary.csv".format(output_prefix))
 
     if output_file is not None:
-        review_file = os.path.join(target_dir, output_file)
+        kscope_file = Path(target_dir, output_file)
     else:
-        review_file = os.path.join(target_dir, "{0}_review.csv".format(output_prefix))
-    kscope_file = review_file.replace("review", "review_kscope")
+        kscope_file = Path(target_dir, "{0}_review_kscope.csv".format(output_prefix))
 
     output_files = []
 
     proc_start = dt.datetime.now()
 
     if log_to_file:
-        proc_log_file = os.path.join(target_dir, "{0}_processing_log_{1}.txt".format(folder_name, proc_start.strftime("%d_%b_%H%M")))
+        proc_log_name = "{0}_processing_log_{1}.txt".format(folder_name, proc_start.strftime("%d_%b_%H%M"))
+        proc_log_file = Path(target_dir, proc_log_name)
         output_files.append(proc_log_file)
     else:
         proc_log_file = None
 
-    ### Inventory .wav files and set up processing directories ###
-    if not os.path.exists(wav_inv_file):
-        logMessage("Creating .wav inventory file...", proc_log_file)
-        wav_inventory = pycnet.file.inventoryFolder(target_dir)
-        output_files.append(wav_inv_file)
+    ### Inventory audio files and set up processing directories ###
+    if not os.path.exists(inv_file):
+        logMessage("Creating {0} inventory file...".format(audio_ext), proc_log_file)
+        audio_inventory = pycnet.file.inventoryFolder(target_dir, print_summary=False, flac_mode=flac_mode)
+        output_files.append(inv_file)
     else:
-        logMessage("Using preexisting .wav inventory file...", proc_log_file)
-        wav_inventory = pycnet.file.readInventoryFile(wav_inv_file)
+        logMessage("Using preexisting {0} inventory file...".format(audio_ext), proc_log_file)
+        audio_inventory = pycnet.file.readInventoryFile(inv_file)
     
-    logMessage('\n' + pycnet.file.summarizeInventory(wav_inventory) + '\n', proc_log_file)
+    logMessage('\n' + pycnet.file.summarizeInventory(audio_inventory, audio_ext) + '\n', proc_log_file)
 
     if spectro_dir is None:
-        image_dir = os.path.join(target_dir, "Temp", "images")
+        image_dir = Path(target_dir, "Temp", "images")
     else:
-        image_dir = os.path.join(spectro_dir, folder_name, "images")
+        image_dir = Path(spectro_dir, folder_name, "images")
     
     ### Generate the spectrograms ###
     if mode in ["process", "spectro"]:
@@ -567,11 +577,11 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
             logMessage("\nCould not create temporary directory in the location requested!", proc_log_file)
             logMessage("Aborting operation.\n", proc_log_file)
             exit()
-        
-        proc_queue = buildProcQueue(target_dir, image_dir)
+
+        proc_queue = buildProcQueue(audio_inventory, target_dir, image_dir)
         logMessage("\nSpectrograms will be generated in the following folders:\n", proc_log_file)
         logMessage('\n'.join(sorted(proc_queue["dirs"])), proc_log_file)
-        
+
         n_cores = mp.cpu_count()
         if n_workers is None:
             n_workers_corr = n_cores
@@ -582,7 +592,7 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
                 logMessage("Cannot use {0} worker processes. Using {1} processes.".format(n_workers, n_workers_corr), proc_log_file)
             else:
                 n_workers_corr = int_workers
-        
+
         logMessage("\nGenerating spectrograms starting {0}...\n".format(proc_start.strftime(time_fmt)), proc_log_file)
         generateSpectrograms(proc_queue, n_workers_corr, show_prog)
         
@@ -641,7 +651,7 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
             else:
                 review_settings =  pycnet.review.parseStrReviewCriteria(review_settings)
 
-        review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version, review_settings)
+        review_df = pycnet.review.makeKscopeReviewTable(class_scores, target_dir, cnet_version, review_settings, flac_mode=flac_mode)
         logMessage(" done. {0} apparent detections found.\n".format(review_df.shape[0]), proc_log_file)
 
         review_df.to_csv(kscope_file, index=False)
@@ -659,7 +669,7 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
         logMessage('\n'.join([os.path.basename(f) for f in output_files]) + '\n', proc_log_file)
 
     if mode == "process":
-        d_hours = sum(wav_inventory["Duration"]) / 3600.
+        d_hours = sum(audio_inventory["Duration"]) / 3600.
         p_hours = (proc_end - proc_start).seconds / 3600.
         dp_ratio = d_hours / p_hours
         logMessage("\nProcessed {0:.1f} h of audio in {1:.1f} h (data:processing ratio = {2:.1f})\n".format(d_hours, p_hours, dp_ratio), proc_log_file)
@@ -667,7 +677,11 @@ def processFolder(mode, target_dir, cnet_version="v5", spectro_dir=None, n_worke
     return
 
 
-def batchProcess(target_dirs, cnet_version="v5", spectro_dir=None, n_workers=None, review_settings=None, log_to_file=False, show_prog=False, cleanup=False, check_images=True, combine_output=False):
+def batchProcess(target_dirs, cnet_version="v5", spectro_dir=None, 
+                n_workers=None, review_settings=None, 
+                log_to_file=False, show_prog=False, cleanup=False, 
+                check_images=True, combine_output=False, 
+                flac_mode=False):
     """Process several folders in sequence using the same parameters.
 
     Essentially acts as a wrapper around processFolder with some basic
@@ -713,6 +727,8 @@ def batchProcess(target_dirs, cnet_version="v5", spectro_dir=None, n_workers=Non
             output files from the output files of the individual 
             folders that were processed.
 
+        flac_mode (bool): Process FLAC files instead of WAV files.
+
     Returns:
 
         Nothing.
@@ -739,26 +755,31 @@ def batchProcess(target_dirs, cnet_version="v5", spectro_dir=None, n_workers=Non
                 log_to_file=log_to_file, 
                 show_prog=show_prog, 
                 cleanup=cleanup, 
-                check_images=check_images)
+                check_images=check_images,
+                flac_mode=flac_mode)
         except:
             print("\nEncountered an error while processing {0}. Proceeding to next folder.\n".format(dir_i))
 
     print(blockMessage("Batch processing complete."))
 
     if combine_output:
-        combineOutputFiles(target_dirs, cnet_version, review_settings)
+        combineOutputFiles(target_dirs, cnet_version, review_settings, flac_mode=flac_mode)
 
     return
 
 
-def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
+def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None, 
+                        keep_original_output=False, flac_mode=False):
     """Consolidate output files generated from a `batch_process` run.
 
-    The combined output files will be saved in the lowest-level 
-    directories containing all the target directories, i.e. the folder
-    corresponding to the longest common path. If that directory is not 
-    writable, files will be saved in the first valid directory in the
-    list of target directories with the prefix "Combined".
+    This function is intended for combining output from folders 
+    representing subsets of a larger dataset, e.g. recording stations
+    from a single site. The combined output files will be saved in the
+    folder representing the lowest-level directory containing all the
+    target directories, i.e. the longest common prefix that is a valid
+    directory path. If there is no valid path shared among all the 
+    target directories, the function will print a warning message and 
+    return without combining anything.
 
     Args:
 
@@ -775,6 +796,11 @@ def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
             groups of class codes followed by the score threshold to be
             used for each class or group.
 
+        keep_original_output (bool): Retain output files from target 
+            folders after combining their contents.
+
+        flac_mode (bool): Assume audio files were .flac, not .wav.
+
     Returns:
 
         Nothing.
@@ -784,23 +810,28 @@ def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
     print('\n'.join(target_dirs))
 
     dir_paths = [Path(dir) for dir in target_dirs]
-    top_dir = Path(*os.path.commonprefix([i.parts for i in dir_paths]))
-    top_name = top_dir.parts[-1]
+    top_dir = Path(os.path.commonpath(dir_paths))
+    top_name = top_dir.name
+    audio_ext = ".flac" if flac_mode else ".wav"
 
-    print("\nCombined output files will be written to {0}.".format(top_dir))
+    if top_dir.is_dir():
+        print("\nCombined output files will be written to {0}.".format(top_dir))
+    else:
+        print("\nWarning: Target directories do not share a common prefix.\nCannot combine output.")
+        return
 
     n_dirs = len(target_dirs)
-    pred_lines, log_lines = [], []
+    pred_lines, log_lines, orig_output_files = [], [], []
 
     for i in range(n_dirs):
         startline = min(i, 1)
 
         dir_i = dir_paths[i]
-        name_i = dir_i.parts[-1]
+        name_i = dir_i.name
 
-        inv_path = Path(dir_i, "{0}_wav_inventory.csv".format(name_i, cnet_version))
+        inv_path_i = Path(dir_i, "{0}_{1}_inventory.csv".format(name_i, audio_ext[1:]))
         try:
-            new_inv = pd.read_csv(inv_path)
+            new_inv = pd.read_csv(inv_path_i)
             inv_dirs = new_inv["Folder"].fillna('')
             inv_paths = [Path(dir_i, j) for j in inv_dirs]
             new_inv_paths = [k.relative_to(top_dir) for k in inv_paths]
@@ -809,29 +840,36 @@ def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
         except:
             pass
 
-        pred_path = Path(dir_i, "{0}_{1}_class_scores.csv".format(name_i, cnet_version))
+        pred_path_i = Path(dir_i, "{0}_{1}_class_scores.csv".format(name_i, cnet_version))
         try:
-            with open(pred_path) as pred_file:
-                pred_lines = pred_lines + pred_file.readlines()[startline:]
+            with open(pred_path_i) as pred_file:
+                pred_lines.extend(pred_file.readlines()[startline:])
         except:
             pass
 
+        review_path_i = Path(dir_i, "{0}_{1}_review_kscope.csv".format(name_i, cnet_version))
+        summary_path_i = Path(dir_i, "{0}_{1}_detection_summary.csv".format(name_i, cnet_version))
+
+        orig_output_files.extend([inv_path_i, pred_path_i, review_path_i, summary_path_i])
+
         log_paths = list(dir_i.glob("{0}_processing_log*".format(name_i)))
         if len(log_paths) == 0:
-            log_path = ''
+            log_path_i = ''
         else:
             if len(log_paths) == 1:
-                log_path = log_paths[0]
+                log_path_i = log_paths[0]
             else:
-                log_path = sorted(log_paths, key=lambda x: os.path.getmtime(x))[0]
-            with open(log_path) as log_file:
+                log_path_i = sorted(log_paths, key=lambda x: os.path.getmtime(x))[0]
+            with open(log_path_i) as log_file:
                 log_lines.append({"dir": dir_i, "log_file": log_path, "log_lines": log_file.readlines()})
+            orig_output_files.append(log_path_i)
+
 
     pred_out_path = Path(top_dir, "{0}_{1}_class_scores.csv".format(top_name, cnet_version))
     with open(pred_out_path, 'w') as pred_out_file:
         pred_out_file.writelines(pred_lines)
 
-    inv_out_path = Path(top_dir, "{0}_wav_inventory.csv".format(top_name))
+    inv_out_path = Path(top_dir, "{0}_{1}_inventory.csv".format(top_name, audio_ext[1:]))
     inv_df.to_csv(inv_out_path, index=False)
 
     pred_df = pycnet.review.readPredFile(pred_out_path)
@@ -840,14 +878,14 @@ def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
     summary_path = Path(top_dir, "{0}_{1}_detection_summary.csv".format(top_name, cnet_version))
     summary_df.to_csv(summary_path, index=False)
 
-    review_df = pycnet.review.makeKscopeReviewTable(pred_df, top_dir, cnet_version, review_settings)
+    review_df = pycnet.review.makeKscopeReviewTable(pred_df, top_dir, cnet_version, review_settings, flac_mode=flac_mode)
     review_path = Path(top_dir, "{0}_{1}_review_kscope.csv".format(top_name, cnet_version))
     review_df.to_csv(review_path, index=False)
 
     n_log_files = len(log_lines)
     if n_log_files > 0:
         log_timestamp_1 = log_lines[0]["log_file"].parts[-1][-15:]
-        log_out_path = Path(top_dir, "{0}_batch_processing_log_{1}".format(top_name, log_timestamp_1))
+        log_out_path = Path(top_dir, "{0}_batch_processing_log_{1}.txt".format(top_name, log_timestamp_1))
         with open(log_out_path, 'w') as log_out_file:
             for j in range(n_log_files):
                 jvals = log_lines[j]
@@ -857,8 +895,14 @@ def combineOutputFiles(target_dirs, cnet_version="v5", review_settings=None):
 
     total_data_h = sum(inv_df["Duration"]) / 3600.
 
-    print("\nFinished combining output files.\n")
-    print("Total data processed: {0:.01f} h\n".format(total_data_h))
+    print("\nFinished combining output files.")
+    
+    if not keep_original_output:
+        for i in orig_output_files:
+            os.remove(i)
+        print("Original output files removed.\n")
+    
+    print("\nTotal data processed: {0:.01f} h\n".format(total_data_h))
 
     return
 
@@ -900,10 +944,10 @@ def parsePycnetArgs():
 
     parser.add_argument("-o", dest="output_file", type=str,
         help="Manually specify filename for review file.")
-        
+
     parser.add_argument("-p", dest="rename_prefix", type=str,
         help="Prefix to use when renaming .wav files.")
-        
+
     parser.add_argument("-l", dest="log_to_file", action="store_true",
         help="Copy output messages to log file.")
 
@@ -912,12 +956,15 @@ def parsePycnetArgs():
 
     parser.add_argument("-a", dest="auto_cleanup", action="store_true",
         help="Remove spectrogram image files and temporary folders when class scores have been generated.")
-        
+
     parser.add_argument("-k", dest="skip_image_check", action="store_true",
         help="Do not check whether all images can be loaded before generating class scores.")
-        
+
     parser.add_argument("-m", dest="combine_output", action="store_true", 
         help="(batch_process only) Combine class scores, .wav inventory, detection summary and review files once batch processing is complete.")
+
+    parser.add_argument("-f", dest="flac_mode", action="store_true",
+        help="Process FLAC files instead of WAV files.")
 
     args = parser.parse_args()
     
